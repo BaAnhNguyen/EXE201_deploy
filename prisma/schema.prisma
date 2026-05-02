@@ -460,5 +460,5 @@ model SubscriptionPayment {
 
   tenant_subscription TenantSubscription @relation(fields: [sub_tenant_id], references: [id])
 
-  @@map("subscription_payments")
+  @@map("subscription_payments") //payment
 }
