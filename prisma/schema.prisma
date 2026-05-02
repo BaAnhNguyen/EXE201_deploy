@@ -1,46 +1,464 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
+// ========================================
+// PLATFORM MANAGEMENT (Admin)
+// ========================================
+
 model Admin {
-  adminId    String   @id @default(uuid())
-
-  managerId  String?
-  manager    Admin?   @relation("AdminHierarchy", fields: [managerId], references: [adminId])
-
-  email      String   @unique
+  id         Int       @id @default(autoincrement())
+  email      String    @unique
   password   String
   full_name  String?
   phone      String?
   avatar     String?
-
-  is_active  Boolean  @default(true)
+  is_active  Boolean   @default(true)
   last_login DateTime?
-  created_at DateTime @default(now())
+  created_at DateTime  @default(now())
+
+  // Self-reference: an Admin can be managed by another Admin
+  manager_id      Int?
+  managed_by      Admin?  @relation("AdminHierarchy", fields: [manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  managed_admins  Admin[] @relation("AdminHierarchy") // tui note lại chỗ này là "AdminHierarchy" chỉ là cái tên để mai mốt 
+                                                      //query cho dễ, kiểu đặt cho có thôi
+  tenants Tenant[]
+
+  @@map("admins")
 }
+
+// ========================================
+// TENANT MANAGEMENT (Multi-tenant SaaS)
+// ========================================
 
 model Tenant {
-  tenantId            String   @id @default(uuid())
+  id                    Int      @id @default(autoincrement())
+  admin_id              Int? // FK to Admin who manages this tenant
+  tenant_name           String
+  tax_percentage        Decimal? @db.Decimal(5, 2)
+  loyal_point_per_unit  Decimal? @db.Decimal(10, 4) // points earned per currency unit
+  is_active             Boolean  @default(true)
+  created_at            DateTime @default(now())
+  update_at             DateTime @updatedAt
 
-  adminId             String
-  admin               Admin     @relation(fields: [adminId], references: [adminId])
+  admin                 Admin?             @relation(fields: [admin_id], references: [id])
+  shops                 Shop[]
+  users                 User[]
+  customers             Customer[]
+  product_categories    ProductCategory[]
+  ingredients           Ingredient[]
+  tenant_subscriptions  TenantSubscription[]
 
-  tenantName          String
-  taxPercentage       Float
-  loyalPointPerUnit   Int
-  isActive            Boolean  @default(true)
-
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  @@map("tenants")
 }
 
+// ========================================
+// SHOP & USER MANAGEMENT
+// ========================================
+
+model Role {
+  id          Int     @id @default(autoincrement())
+  role_code   String  @unique
+  description String?
+  permissions Json?
+
+  users User[]
+
+  @@map("roles")
+}
+
+model User {
+  id         Int       @id @default(autoincrement())
+  tenant_id  Int?
+  shop_id    Int?
+  role_id    Int?
+  email      String    @unique
+  password   String
+  avatar     String?
+  full_name  String?
+  phone      String?
+  is_active  Boolean   @default(true)
+  last_login DateTime?
+  created_at DateTime  @default(now())
+  updated_at DateTime  @updatedAt
+
+  tenant Tenant? @relation(fields: [tenant_id], references: [id])
+  shop   Shop?   @relation(fields: [shop_id], references: [id])
+  role   Role?   @relation(fields: [role_id], references: [id])
+
+  // ShopOwner profile (1:1 for users with SHOP_OWNER role)
+  shop_owner ShopOwner?
+
+  // Shifts (cashier works in shifts)
+  shift_cashiers ShiftCashier[]
+
+  // Orders processed by this user (as cashier)
+  orders Orders[] @relation("OrderCashier")
+
+  @@map("users")
+}
+
+model ShopOwner {
+  id               Int      @id @default(autoincrement())
+  user_id          Int      @unique
+  shop_id          Int?
+  owner_manager_id Int? // Another ShopOwner who manages this one
+  phone            String?
+  full_name        String?
+  avatar           String?
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+
+  user    User      @relation(fields: [user_id], references: [id])
+  shop    Shop?     @relation(fields: [shop_id], references: [id])
+
+  // Self-reference for owner hierarchy
+  managed_by    ShopOwner?  @relation("ShopOwnerHierarchy", fields: [owner_manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  managed_owners ShopOwner[] @relation("ShopOwnerHierarchy")
+
+  @@map("shop_owners")
+}
+
+model Shop {
+  id         Int      @id @default(autoincrement())
+  tenant_id  Int
+  shop_name  String
+  address    String?
+  phone      String?
+  is_active  Boolean  @default(true)
+  created_at DateTime @default(now())
+  update_at  DateTime @updatedAt
+
+  tenant                  Tenant                  @relation(fields: [tenant_id], references: [id])
+  users                   User[]
+  shop_owners             ShopOwner[]
+  shifts                  Shift[]
+  inventories             Inventory[]
+  merchandises            Merchandise[]
+  merchandise_redemptions MerchandiseRedemption[]
+
+  @@map("shops")
+}
+
+model Shift {
+  id           Int       @id @default(autoincrement())
+  shop_id      Int
+  start_time   DateTime
+  end_time     DateTime?
+  shift_status String?
+
+  shop           Shop         @relation(fields: [shop_id], references: [id])
+  orders         Orders[]
+  shift_cashiers ShiftCashier[]
+
+  @@map("shifts")
+}
+
+model ShiftCashier {
+  shift_id   Int
+  cashier_id Int
+
+  shift   Shift @relation(fields: [shift_id], references: [id])
+  cashier User  @relation(fields: [cashier_id], references: [id])
+
+  @@id([shift_id, cashier_id])
+  @@map("shift_cashiers")
+}
+
+// ========================================
+// CUSTOMER MANAGEMENT
+// ========================================
+
+model Customer {
+  id            Int      @id @default(autoincrement())
+  tenant_id     Int
+  phone         String
+  full_name     String?
+  member_rank   String?
+  loyalty_point Int      @default(0)
+  created_at    DateTime @default(now())
+
+  tenant                  Tenant                  @relation(fields: [tenant_id], references: [id])
+  orders                  Orders[]
+  merchandise_redemptions MerchandiseRedemption[]
+
+  @@map("customers")
+}
+
+// ========================================
+// PRODUCT & CATEGORY MANAGEMENT
+// ========================================
+
+model ProductCategory {
+  id              Int     @id @default(autoincrement())
+  par_category_id Int? // Self-reference for nested categories
+  tenant_id       Int
+  category_name   String
+  is_active       Boolean @default(true)
+
+  tenant     Tenant           @relation(fields: [tenant_id], references: [id])
+  parent     ProductCategory?  @relation("CategoryHierarchy", fields: [par_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children   ProductCategory[] @relation("CategoryHierarchy")
+  products   Product[]
+
+  @@map("product_categories")
+}
+
+model Product {
+  id           Int      @id @default(autoincrement())
+  category_id  Int
+  product_name String
+  sku          String   @unique
+  barcode      String?
+  description  String?
+  measure_unit String?
+  basic_price  Decimal  @db.Decimal(10, 2)
+  unit_price   Decimal  @db.Decimal(10, 2)
+  is_active    Boolean  @default(true)
+  created_at   DateTime @default(now())
+  updated_at   DateTime @updatedAt
+
+  category           ProductCategory    @relation(fields: [category_id], references: [id])
+  order_items        OrderItem[]
+  ingredient_products IngredientProduct[]
+
+  @@map("products")
+}
+
+// ========================================
+// INGREDIENT & INVENTORY MANAGEMENT
+// ========================================
+
+model Ingredient {
+  id          Int      @id @default(autoincrement())
+  tenant_id   Int
+  name        String
+  unit        String?
+  description String?
+  is_active   Boolean  @default(true)
+  created_at  DateTime @default(now())
+  update_at   DateTime @updatedAt
+
+  tenant              Tenant              @relation(fields: [tenant_id], references: [id])
+  ingredient_products IngredientProduct[]
+  inventory_items     InventoryItem[]
+
+  @@map("ingredients")
+}
+
+// Junction: which ingredients are required for a product (recipe/BOM)
+model IngredientProduct {
+  product_id        Int
+  ingredient_id     Int
+  quantity_required Decimal @db.Decimal(10, 4)
+  unit              String?
+
+  product    Product    @relation(fields: [product_id], references: [id])
+  ingredient Ingredient @relation(fields: [ingredient_id], references: [id])
+
+  @@id([product_id, ingredient_id])
+  @@map("ingredient_products")
+}
+
+model Inventory {
+  id                 Int       @id @default(autoincrement())
+  shop_id            Int       @unique
+  current_quantity   Int       @default(0)
+  minimum_threshold  Int?
+  reorder_quantity   Int?
+  last_restock_at    DateTime?
+  update_at          DateTime  @updatedAt
+
+  shop            Shop            @relation(fields: [shop_id], references: [id])
+  inventory_items InventoryItem[]
+
+  @@map("inventories")
+}
+
+model InventoryItem {
+  id                 Int      @id @default(autoincrement())
+  ingredient_id      Int
+  inventory_id       Int
+  theorical_quantity Int      @default(0) // Expected based on transactions
+  adjusted_quantity  Int?     @default(0) // Manually adjusted
+  actual_quantity    Int?     @default(0) // Physically counted
+  updated_at         DateTime @updatedAt
+
+  ingredient       Ingredient       @relation(fields: [ingredient_id], references: [id])
+  inventory        Inventory        @relation(fields: [inventory_id], references: [id])
+
+  @@map("inventory_items")
+}
+
+// ========================================
+// MERCHANDISE & REWARDS
+// ========================================
+
+model Merchandise {
+  id               Int      @id @default(autoincrement())
+  shop_id          Int
+  merchandise_name String
+  description      String?
+  sku              String?
+  barcode          String?
+  point_required   Int
+  total_quantity   Int
+  is_active        Boolean  @default(true)
+  created_at       DateTime @default(now())
+  update_at        DateTime @updatedAt
+
+  shop        Shop                    @relation(fields: [shop_id], references: [id])
+  redemptions MerchandiseRedemption[]
+
+  @@map("merchandises")
+}
+
+model MerchandiseRedemption {
+  id             Int      @id @default(autoincrement())
+  customer_id    Int
+  merchandise_id Int
+  shop_id        Int
+  point_spent    Int
+  redemption_date DateTime @default(now())
+
+  customer    Customer    @relation(fields: [customer_id], references: [id])
+  merchandise Merchandise @relation(fields: [merchandise_id], references: [id])
+  shop        Shop        @relation(fields: [shop_id], references: [id])
+
+  @@map("merchandise_redemptions")
+}
+
+// ========================================
+// ORDERS & PAYMENTS
+// ========================================
+
+model Orders {
+  id              Int       @id @default(autoincrement())
+  shift_id        Int
+  cashier_id      Int // User (cashier) who processed this order
+  customer_id     Int?
+  subtotal_amount Decimal   @db.Decimal(10, 2)
+  grand_total     Decimal   @db.Decimal(10, 2)
+  order_status    String
+  notes           String?
+  created_at      DateTime  @default(now())
+  completed_at    DateTime?
+  cancelled_at    DateTime?
+
+  shift       Shift       @relation(fields: [shift_id], references: [id])
+  cashier     User        @relation("OrderCashier", fields: [cashier_id], references: [id])
+  customer    Customer?   @relation(fields: [customer_id], references: [id])
+  order_items OrderItem[]
+  payments    Payment[]
+
+  @@map("orders")
+}
+
+model OrderItem {
+  id         Int     @id @default(autoincrement())
+  product_id Int
+  order_id   Int
+  quantity   Int
+  unit_price Decimal @db.Decimal(10, 2)
+
+  product Product @relation(fields: [product_id], references: [id])
+  order   Orders  @relation(fields: [order_id], references: [id])
+
+  @@map("order_items")
+}
+
+model Payment {
+  id             Int      @id @default(autoincrement())
+  order_id       Int
+  amount_paid    Decimal  @db.Decimal(10, 2)
+  currency       String   @default("VND")
+  payment_method String
+  payment_status String
+  created_at     DateTime @default(now())
+  update_at      DateTime @updatedAt
+
+  order Orders @relation(fields: [order_id], references: [id])
+
+  @@map("payments")
+}
+
+// ========================================
+// SUBSCRIPTION MANAGEMENT (SaaS)
+// ========================================
+
+model Subscription {
+  id            Int       @id @default(autoincrement())
+  package_code  String    @unique
+  description   String?
+  price         Decimal   @db.Decimal(10, 2)
+  billing_cycle String
+  is_active     Boolean   @default(true)
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @default(now()) @updatedAt
+  deleted_at    DateTime?
+
+  tenant_subscriptions  TenantSubscription[]
+  subscription_features SubscriptionFeature[]
+
+  @@map("subscriptions")
+}
+
+model Feature {
+  id           Int     @id @default(autoincrement())
+  feature_code String  @unique // "INVENTORY_MANAGEMENT", "MULTI_SHOP", "LOYALTY_PROGRAM"
+  permission_code String? @unique // "CAN_MANAGE_INVENTORY", "CAN_CREATE_SHOP", "CAN_REDEEM_POINTS"
+  description  String?
+  is_active    Boolean @default(true)
+
+  subscription_features SubscriptionFeature[]
+
+  @@map("features")
+}
+
+model SubscriptionFeature {
+  subscription_id Int
+  feature_id      Int
+
+  subscription Subscription @relation(fields: [subscription_id], references: [id])
+  feature      Feature      @relation(fields: [feature_id], references: [id])
+
+  @@id([subscription_id, feature_id])
+  @@map("subscription_features")
+}
+model TenantSubscription {
+  id                 Int       @id @default(autoincrement())
+  subscription_id    Int
+  tenant_id          Int
+  number_of_renewals Int?      @default(0)
+  start_date         DateTime  @default(now())
+  end_date           DateTime?
+  created_at         DateTime  @default(now())
+  updated_at         DateTime  @updatedAt
+  is_expired         Boolean   @default(false)
+
+  subscription          Subscription          @relation(fields: [subscription_id], references: [id])
+  tenant                Tenant                @relation(fields: [tenant_id], references: [id])
+  subscription_payments SubscriptionPayment[]
+
+  @@map("tenant_subscriptions")
+}
+
+model SubscriptionPayment {
+  id                 Int      @id @default(autoincrement())
+  sub_tenant_id      Int
+  method             String
+  amount             Decimal  @db.Decimal(10, 2)
+  created_at         DateTime @default(now())
+  payment_status     String
+
+  tenant_subscription TenantSubscription @relation(fields: [sub_tenant_id], references: [id])
+
+  @@map("subscription_payments") //payment
+}

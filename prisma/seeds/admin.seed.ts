@@ -32,7 +32,7 @@ export async function seedAdmin(prisma: PrismaClient) {
         email: staffEmail,
         password,
         full_name: 'Staff Admin',
-        manager_id: manager.admin_id,
+        manager_id: manager.id,
       },
     });
   });

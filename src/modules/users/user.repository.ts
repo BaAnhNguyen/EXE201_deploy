@@ -12,7 +12,7 @@ export class UserRepository {
     });
   }
 
-  create(data: client.Prisma.UserCreateInput) {
+  create(data: any) {
     return this.prisma.user.create({ data });
   }
 }
