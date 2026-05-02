@@ -413,7 +413,6 @@ model Subscription {
 model Feature {
   id           Int     @id @default(autoincrement())
   feature_code String  @unique // "INVENTORY_MANAGEMENT", "MULTI_SHOP", "LOYALTY_PROGRAM"
-  permission_code String? @unique // "CAN_MANAGE_INVENTORY", "CAN_CREATE_SHOP", "CAN_REDEEM_POINTS"
   description  String?
   is_active    Boolean @default(true)
 
