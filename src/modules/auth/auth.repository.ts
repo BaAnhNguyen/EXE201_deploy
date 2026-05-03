@@ -36,4 +36,17 @@ export class AuthRepository {
 			data: { last_login: new Date() },
 		});
 	}
+
+	updatePassword(userId: number, hashedPassword: string): Promise<User> {
+		return this.prisma.user.update({
+			where: { id: userId },
+			data: { password: hashedPassword },
+		});
+	}
+
+	findUserById(userId: number): Promise<User | null> {
+		return this.prisma.user.findUnique({
+			where: { id: userId },
+		});
+	}
 }

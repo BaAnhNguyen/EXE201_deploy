@@ -1,8 +1,8 @@
 import { Module } from '@nestjs/common';
-import { RandomUtil } from './utils/random.util';
+import { EmailService } from './services/email.service';
 
 @Module({
-  providers: [RandomUtil],
-  exports: [RandomUtil],
+  providers: [EmailService],
+  exports: [EmailService],
 })
 export class CommonModule {}
