@@ -4,6 +4,7 @@ import { CommonModule } from './common/common.module';
 import { appConfigurations } from './config';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AdminModule } from './modules/admins/admin.module';
 
 @Module({
   imports: [
@@ -16,6 +17,7 @@ import { AuthModule } from './modules/auth/auth.module';
     CommonModule,
     DatabaseModule,
     AuthModule,
+    AdminModule,
   ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
