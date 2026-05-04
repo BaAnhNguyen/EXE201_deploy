@@ -34,7 +34,7 @@ type ResetPasswordPayload = {
 
 @Injectable()
 export class AuthService {
-	private readonly RESET_PASSWORD_EXPIRES_IN = '1h';
+	private readonly RESET_PASSWORD_EXPIRES_IN = '15m';
 
 	constructor(
 		private readonly authRepository: AuthRepository,
