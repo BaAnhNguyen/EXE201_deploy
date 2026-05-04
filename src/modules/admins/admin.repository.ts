@@ -28,4 +28,22 @@ export class AdminRepository {
 			data: { last_login: new Date() },
 		});
 	}
+
+	async findAllAdmins(): Promise<Admin[]> {
+		return this.prisma.admin.findMany();
+	}
+
+	async deactivateAdmin(id: number): Promise<Admin> {
+		return this.prisma.admin.update({
+			where: { id },
+			data: { is_active: false },
+		});
+	}
+
+	async activateAdmin(id: number): Promise<Admin> {
+		return this.prisma.admin.update({
+			where: { id },
+			data: { is_active: true },
+		});
+	}
 }

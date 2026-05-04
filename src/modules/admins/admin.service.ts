@@ -95,4 +95,35 @@ export class AdminService {
 		const { password, ...adminWithoutPassword } = admin;
 		return adminWithoutPassword;
 	}
+
+	async getAllAdmins() {
+		const admins = await this.adminRepository.findAllAdmins();
+		// Remove passwords from response
+		return admins.map(admin => {
+			const { password, ...adminWithoutPassword } = admin;
+			return adminWithoutPassword;
+		});
+	}
+
+	async deactivateAdmin(id: number) {
+		const admin = await this.adminRepository.findAdminById(id);
+		if (!admin) {
+			throw new BadRequestException('Admin not found');
+		}
+
+		const deactivatedAdmin = await this.adminRepository.deactivateAdmin(id);
+		const { password, ...adminWithoutPassword } = deactivatedAdmin;
+		return adminWithoutPassword;
+	}
+
+	async activateAdmin(id: number) {
+		const admin = await this.adminRepository.findAdminById(id);
+		if (!admin) {
+			throw new BadRequestException('Admin not found');
+		}
+
+		const activatedAdmin = await this.adminRepository.activateAdmin(id);
+		const { password, ...activatedAdminWithoutPassword } = activatedAdmin;
+		return activatedAdminWithoutPassword;
+	}
 }
