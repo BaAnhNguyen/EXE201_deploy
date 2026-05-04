@@ -57,7 +57,8 @@ export class EmailService {
 	}
 
 	async sendResetPasswordEmail(email: string, resetToken: string, appUrl: string = 'http://localhost:5000'): Promise<void> {
-		const resetLink = `${appUrl}/reset-password?token=${resetToken}`;
+		const resetPath = process.env.RESET_PASSWORD_PATH || '/forgot-password';
+		const resetLink = `${appUrl}${resetPath}?token=${resetToken}`;
 
 		const mailOptions = {
 			from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@salesmanagement.com',
@@ -96,7 +97,7 @@ export class EmailService {
 				<p>Or copy and paste this link in your browser:</p>
 				<p style="background-color: #f5f5f5; padding: 10px; word-break: break-all;">${resetLink}</p>
 				<p style="color: #666; font-size: 12px;">
-					This link will expire in 1 hour.<br>
+					This link will expire in 15 minutes.<br>
 					If you did not request a password reset, please ignore this email.
 				</p>
 			</div>
