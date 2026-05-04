@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UnauthorizedException, UseGuards } from '@nestjs/common';
+import { Body, Controller, Post, Get, Patch, Param, Req, UnauthorizedException, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { LoginAdminDto } from './dto/login-admin.dto';
@@ -32,5 +32,23 @@ export class AdminController {
 		}
 
 		return this.adminService.createAdmin(createAdminDto, managerId);
+	}
+
+	@Get()
+	@UseGuards(JwtAuthGuard)
+	getAllAdmins() {
+		return this.adminService.getAllAdmins();
+	}
+
+	@Patch(':id/deactivate')
+	@UseGuards(JwtAuthGuard)
+	deactivateAdmin(@Param('id', ParseIntPipe) id: number) {
+		return this.adminService.deactivateAdmin(id);
+	}
+
+	@Patch(':id/activate')
+	@UseGuards(JwtAuthGuard)
+	activateAdmin(@Param('id', ParseIntPipe) id: number) {
+		return this.adminService.activateAdmin(id);
 	}
 }
