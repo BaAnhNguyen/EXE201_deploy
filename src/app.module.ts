@@ -5,6 +5,7 @@ import { appConfigurations } from './config';
 import { DatabaseModule } from './database/database.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AdminModule } from './modules/admins/admin.module';
+import { RoleModule } from './modules/roles/role.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { AdminModule } from './modules/admins/admin.module';
     DatabaseModule,
     AuthModule,
     AdminModule,
+    RoleModule,
   ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
