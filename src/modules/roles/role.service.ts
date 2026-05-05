@@ -5,19 +5,9 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 
 @Injectable()
 export class RoleService {
-	// Only allow these roles to be created/managed
-	private readonly ALLOWED_ROLES = ['SHOPOWNER', 'CASHIER'];
-
 	constructor(private readonly roleRepository: RoleRepository) {}
 
 	async create(createRoleDto: CreateRoleDto) {
-		// Validate that only allowed roles can be created
-		if (!this.ALLOWED_ROLES.includes(createRoleDto.role_code)) {
-			throw new BadRequestException(
-				`Role '${createRoleDto.role_code}' is not allowed. Allowed roles: ${this.ALLOWED_ROLES.join(', ')}`
-			);
-		}
-
 		// Check if role already exists
 		const existingRole = await this.roleRepository.findByRoleCode(createRoleDto.role_code);
 		if (existingRole) {
@@ -57,12 +47,6 @@ export class RoleService {
 
 		// Validate if role_code is being updated
 		if (updateRoleDto.role_code) {
-			if (!this.ALLOWED_ROLES.includes(updateRoleDto.role_code)) {
-				throw new BadRequestException(
-					`Role '${updateRoleDto.role_code}' is not allowed. Allowed roles: ${this.ALLOWED_ROLES.join(', ')}`
-				);
-			}
-
 			// Check if new role code already exists
 			const existingRole = await this.roleRepository.findByRoleCode(updateRoleDto.role_code);
 			if (existingRole && existingRole.id !== id) {
