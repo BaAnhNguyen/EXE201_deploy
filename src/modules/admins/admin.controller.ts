@@ -1,7 +1,8 @@
-import { Body, Controller, Post, Get, Patch, Param, Req, UnauthorizedException, UseGuards, ParseIntPipe } from '@nestjs/common';
+import { Body, Controller, Post, Get, Patch, Delete, Param, Req, UnauthorizedException, UseGuards, ParseIntPipe } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { LoginAdminDto } from './dto/login-admin.dto';
+import { UpdateAdminDto } from './dto/update-admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('admins')
@@ -42,13 +43,41 @@ export class AdminController {
 
 	@Patch(':id/deactivate')
 	@UseGuards(JwtAuthGuard)
-	deactivateAdmin(@Param('id', ParseIntPipe) id: number) {
-		return this.adminService.deactivateAdmin(id);
+	deactivateAdmin(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+		const currentAdminId = req.user?.sub || req.user?.id;
+
+		if (!currentAdminId) {
+			throw new UnauthorizedException('Authentication required.');
+		}
+
+		return this.adminService.deactivateAdmin(id, currentAdminId);
 	}
 
 	@Patch(':id/activate')
 	@UseGuards(JwtAuthGuard)
-	activateAdmin(@Param('id', ParseIntPipe) id: number) {
-		return this.adminService.activateAdmin(id);
+	activateAdmin(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
+		const currentAdminId = req.user?.sub || req.user?.id;
+
+		if (!currentAdminId) {
+			throw new UnauthorizedException('Authentication required.');
+		}
+
+		return this.adminService.activateAdmin(id, currentAdminId);
+	}
+
+	@Patch(':id')
+	@UseGuards(JwtAuthGuard)
+	updateAdmin(
+		@Param('id', ParseIntPipe) id: number,
+		@Body() updateAdminDto: UpdateAdminDto,
+		@Req() req: any,
+	) {
+		const currentAdminId = req.user?.sub || req.user?.id;
+
+		if (!currentAdminId) {
+			throw new UnauthorizedException('Authentication required.');
+		}
+
+		return this.adminService.updateAdmin(id, updateAdminDto, currentAdminId);
 	}
 }

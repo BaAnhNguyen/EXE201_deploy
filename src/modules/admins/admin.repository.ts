@@ -46,4 +46,17 @@ export class AdminRepository {
 			data: { is_active: true },
 		});
 	}
+
+	async updateAdmin(id: number, data: Prisma.AdminUpdateInput): Promise<Admin> {
+		return this.prisma.admin.update({
+			where: { id },
+			data,
+		});
+	}
+
+	async deleteAdmin(id: number): Promise<Admin> {
+		return this.prisma.admin.delete({
+			where: { id },
+		});
+	}
 }
