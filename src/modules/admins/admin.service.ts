@@ -1,9 +1,10 @@
-import { ConflictException, Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import { ConflictException, Injectable, BadRequestException, UnauthorizedException, ForbiddenException } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { JwtService } from '@nestjs/jwt';
 import { AdminRepository } from './admin.repository';
 import { CreateAdminDto } from './dto/create-admin.dto';
 import { LoginAdminDto } from './dto/login-admin.dto';
+import { UpdateAdminDto } from './dto/update-admin.dto';
 import { Admin } from '@prisma/client';
 
 @Injectable()
@@ -105,7 +106,9 @@ export class AdminService {
 		});
 	}
 
-	async deactivateAdmin(id: number) {
+	async deactivateAdmin(id: number, currentAdminId: number) {
+		await this.ensureInitialAdmin(currentAdminId);
+
 		const admin = await this.adminRepository.findAdminById(id);
 		if (!admin) {
 			throw new BadRequestException('Admin not found');
@@ -116,7 +119,9 @@ export class AdminService {
 		return adminWithoutPassword;
 	}
 
-	async activateAdmin(id: number) {
+	async activateAdmin(id: number, currentAdminId: number) {
+		await this.ensureInitialAdmin(currentAdminId);
+
 		const admin = await this.adminRepository.findAdminById(id);
 		if (!admin) {
 			throw new BadRequestException('Admin not found');
@@ -125,5 +130,46 @@ export class AdminService {
 		const activatedAdmin = await this.adminRepository.activateAdmin(id);
 		const { password, ...activatedAdminWithoutPassword } = activatedAdmin;
 		return activatedAdminWithoutPassword;
+	}
+
+	async updateAdmin(id: number, updateAdminDto: UpdateAdminDto, currentAdminId: number) {
+		await this.ensureInitialAdmin(currentAdminId);
+
+		const admin = await this.adminRepository.findAdminById(id);
+		if (!admin) {
+			throw new BadRequestException('Admin not found');
+		}
+
+		if (updateAdminDto.email) {
+			const existingAdmin = await this.adminRepository.findAdminByEmail(updateAdminDto.email);
+			if (existingAdmin && existingAdmin.id !== id) {
+				throw new ConflictException('Admin with this email already exists');
+			}
+		}
+
+		const updateData: Parameters<AdminRepository['updateAdmin']>[1] = {
+			email: updateAdminDto.email,
+			full_name: updateAdminDto.full_name,
+			phone: updateAdminDto.phone,
+			avatar: updateAdminDto.avatar,
+			password: updateAdminDto.password ? await bcrypt.hash(updateAdminDto.password, 10) : undefined,
+		};
+
+		const updatedAdmin = await this.adminRepository.updateAdmin(id, updateData);
+		const { password, ...updatedAdminWithoutPassword } = updatedAdmin;
+		return updatedAdminWithoutPassword;
+	}
+
+	private async ensureInitialAdmin(adminId: number) {
+		const currentAdmin = await this.adminRepository.findAdminById(adminId);
+		if (!currentAdmin) {
+			throw new UnauthorizedException('Admin not found');
+		}
+
+		if (currentAdmin.manager_id !== null) {
+			throw new ForbiddenException('Only initial admins can manage other admins');
+		}
+
+		return currentAdmin;
 	}
 }
