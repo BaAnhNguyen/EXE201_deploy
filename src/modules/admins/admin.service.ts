@@ -46,7 +46,7 @@ export class AdminService {
 		const payload = {
 			sub: admin.id,
 			email: admin.email,
-			role: 'ADMIN', // Optional: Helps to identify token type later if needed
+			type: 'ADMIN', // Admin is not a role, it's a special type
 		};
 
 		return this.jwtService.signAsync(payload);
