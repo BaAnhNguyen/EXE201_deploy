@@ -4,7 +4,7 @@ import { CreateAdminDto } from './dto/create-admin.dto';
 import { LoginAdminDto } from './dto/login-admin.dto';
 import { UpdateAdminDto } from './dto/update-admin.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-
+import { AdminOnlyGuard } from 'src/common/guards/admin-only.guard';
 @Controller('admins')
 export class AdminController {
 	constructor(private readonly adminService: AdminService) {}
@@ -20,7 +20,7 @@ export class AdminController {
 	}
 
 	@Post()
-	@UseGuards(JwtAuthGuard)
+	@UseGuards(JwtAuthGuard,AdminOnlyGuard)
 	createAdmin(
 		@Body() createAdminDto: CreateAdminDto,
 		@Req() req: any // Typically this would be handled by a JwtAuthGuard injecting the user into req
@@ -36,13 +36,13 @@ export class AdminController {
 	}
 
 	@Get()
-	@UseGuards(JwtAuthGuard)
+	@UseGuards(JwtAuthGuard, AdminOnlyGuard)
 	getAllAdmins() {
 		return this.adminService.getAllAdmins();
 	}
 
 	@Patch(':id/deactivate')
-	@UseGuards(JwtAuthGuard)
+	@UseGuards(JwtAuthGuard, AdminOnlyGuard)
 	deactivateAdmin(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
 		const currentAdminId = req.user?.sub || req.user?.id;
 
@@ -54,7 +54,7 @@ export class AdminController {
 	}
 
 	@Patch(':id/activate')
-	@UseGuards(JwtAuthGuard)
+	@UseGuards(JwtAuthGuard, AdminOnlyGuard)
 	activateAdmin(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
 		const currentAdminId = req.user?.sub || req.user?.id;
 
@@ -66,7 +66,7 @@ export class AdminController {
 	}
 
 	@Patch(':id')
-	@UseGuards(JwtAuthGuard)
+	@UseGuards(JwtAuthGuard, AdminOnlyGuard)
 	updateAdmin(
 		@Param('id', ParseIntPipe) id: number,
 		@Body() updateAdminDto: UpdateAdminDto,

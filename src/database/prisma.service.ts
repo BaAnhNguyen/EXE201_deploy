@@ -31,7 +31,7 @@ export class PrismaService
         : `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}connect_timeout=30`;
 
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+     
     const pool = new Pool({
         connectionString,
         max: Number(process.env.DB_POOL_MAX) || 10,
@@ -39,11 +39,11 @@ export class PrismaService
         connectionTimeoutMillis: 30000,
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+     
     const adapter = new PrismaPg(pool);
 
     super({
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+       
       adapter,
       log: ['error', 'warn'],
     });
