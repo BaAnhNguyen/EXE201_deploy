@@ -8,6 +8,7 @@ import { AdminModule } from './modules/admins/admin.module';
 import { RoleModule } from './modules/roles/role.module';
 import { SubscriptionModule } from './modules/subscriptions/subscription.module';
 import { CustomerModule } from './modules/customers/customer.module';
+import { TenantModule } from './modules/tenants/tenant.module';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { CustomerModule } from './modules/customers/customer.module';
     RoleModule,
     SubscriptionModule,
     CustomerModule,
+    TenantModule,
   ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
