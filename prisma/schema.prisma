@@ -408,6 +408,7 @@ model Subscription {
 
   tenant_subscriptions  TenantSubscription[]
   subscription_features SubscriptionFeature[]
+  pending_subscription  PendingSubscription[]
 
   @@map("subscriptions")
 }
@@ -462,4 +463,21 @@ model SubscriptionPayment {
   tenant_subscription TenantSubscription @relation(fields: [sub_tenant_id], references: [id])
 
   @@map("subscription_payments") //payment
+}
+
+model PendingSubscription {
+  id              Int      @id @default(autoincrement())
+  subscription_id Int
+  username        String
+  email           String
+  password        String   
+  tenant_name     String
+  payos_order_code String  @unique // mã đơn hàng PayOS
+  status          String   @default("PENDING") // PENDING | PAID | CANCELLED | EXPIRED
+  expires_at      DateTime // created_at + 2 phút
+  created_at      DateTime @default(now())
+
+  subscription Subscription @relation(fields: [subscription_id], references: [id])
+
+  @@map("pending_subscriptions")
 }
