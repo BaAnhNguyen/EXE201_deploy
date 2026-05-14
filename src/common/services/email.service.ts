@@ -1,26 +1,33 @@
 import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
 @Injectable()
 export class EmailService {
 	private transporter: nodemailer.Transporter;
 
-	constructor() {
+	constructor(private readonly configService: ConfigService) {
 		this.initializeTransporter();
 	}
 
 	private initializeTransporter() {
+		const host = this.configService.get<string>('EMAIL_HOST') || process.env.EMAIL_HOST || 'smtp.gmail.com';
+		const portStr = this.configService.get<string>('EMAIL_PORT') || process.env.EMAIL_PORT || '587';
+		const secureStr = this.configService.get<string>('EMAIL_SECURE') || process.env.EMAIL_SECURE;
+		const user = this.configService.get<string>('EMAIL_USER') || process.env.EMAIL_USER;
+		const pass = this.configService.get<string>('EMAIL_PASS') || process.env.EMAIL_PASS;
+		
 		const smtpConfig = {
-			host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-			port: parseInt(process.env.EMAIL_PORT || '587'),
-			secure: process.env.EMAIL_SECURE === 'true', // false for 587, true for 465
-			auth: process.env.EMAIL_USER && process.env.EMAIL_PASS ? {
-				user: process.env.EMAIL_USER,
-				pass: process.env.EMAIL_PASS,
+			host,
+			port: parseInt(portStr),
+			secure: secureStr === 'true', // false for 587, true for 465
+			auth: user && pass ? {
+				user,
+				pass,
 			} : undefined,
-			connectionTimeout: parseInt(process.env.EMAIL_CONNECTION_TIMEOUT || '10000'),
-			greetingTimeout: parseInt(process.env.EMAIL_GREETING_TIMEOUT || '10000'),
-			socketTimeout: parseInt(process.env.EMAIL_SOCKET_TIMEOUT || '15000'),
+			connectionTimeout: 10000,
+			greetingTimeout: 10000,
+			socketTimeout: 15000,
 		};
 
 		this.transporter = nodemailer.createTransport(smtpConfig);
@@ -35,33 +42,18 @@ export class EmailService {
 			await this.transporter.verify();
 			return;
 		} catch (err) {
-			console.warn('SMTP verify failed, falling back to Ethereal test account', err?.message ?? err);
-		}
-
-		// Fallback to Ethereal test account for development when local SMTP is not available
-		try {
-			const testAccount = await nodemailer.createTestAccount();
-			this.transporter = nodemailer.createTransport({
-				host: testAccount.smtp.host,
-				port: testAccount.smtp.port,
-				secure: testAccount.smtp.secure,
-				auth: {
-					user: testAccount.user,
-					pass: testAccount.pass,
-				},
-			});
-			console.log('Using Ethereal test account for emails. Preview at', 'https://ethereal.email/messages');
-		} catch (err) {
-			console.error('Failed to create Ethereal test account fallback:', err);
+			console.error('SMTP verify failed:', err?.message ?? err);
+			throw err;
 		}
 	}
 
 	async sendResetPasswordEmail(email: string, resetToken: string, appUrl: string = 'http://localhost:5000'): Promise<void> {
-		const resetPath = process.env.RESET_PASSWORD_PATH || '/forgot-password';
+		const resetPath = this.configService.get<string>('RESET_PASSWORD_PATH') || process.env.RESET_PASSWORD_PATH || '/forgot-password';
 		const resetLink = `${appUrl}${resetPath}?token=${resetToken}`;
 
+		const from = this.configService.get<string>('EMAIL_FROM') || process.env.EMAIL_FROM || this.configService.get<string>('EMAIL_USER') || process.env.EMAIL_USER || 'noreply@salesmanagement.com';
 		const mailOptions = {
-			from: process.env.EMAIL_FROM || process.env.EMAIL_USER || 'noreply@salesmanagement.com',
+			from,
 			to: email,
 			subject: 'Password Reset Request',
 			html: this.getResetPasswordEmailTemplate(resetLink),
@@ -77,10 +69,7 @@ export class EmailService {
 			}
 		} catch (error) {
 			console.error('Error sending reset password email:', error);
-			// Silently fail in development, throw in production
-			if (process.env.NODE_ENV === 'production') {
-				throw error;
-			}
+			throw error;
 		}
 	}
 

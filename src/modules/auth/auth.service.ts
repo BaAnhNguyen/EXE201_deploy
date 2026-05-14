@@ -30,6 +30,7 @@ type ResetPasswordPayload = {
 	sub: number;
 	email: string;
 	type: 'reset-password';
+	accountType: 'user' | 'admin';
 };
 
 @Injectable()
@@ -110,9 +111,21 @@ export class AuthService {
 	}
 
 	async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
-		const user = await this.authRepository.findUserByEmail(forgotPasswordDto.email);
+		let account = await this.authRepository.findUserByEmail(forgotPasswordDto.email);
+		let accountType: 'user' | 'admin' = 'user';
 
-		if (!user) {
+		if (!account) {
+			// Check if the email belongs to an Admin instead
+			const admin = await this.prismaService.admin.findUnique({
+				where: { email: forgotPasswordDto.email }
+			});
+			if (admin) {
+				account = admin as any; // Cast safely for this scope
+				accountType = 'admin';
+			}
+		}
+
+		if (!account) {
 			// Don't reveal if user exists or not for security
 			return {
 				message: 'If an account exists with that email, a password reset link will be sent',
@@ -120,11 +133,11 @@ export class AuthService {
 		}
 
 		try {
-			const resetToken = this.generateResetPasswordToken(user);
+			const resetToken = this.generateResetPasswordToken(account as any, accountType);
 			const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
 			
 			await this.emailService.sendResetPasswordEmail(
-				user.email,
+				account.email,
 				resetToken,
 				appUrl,
 			);
@@ -143,7 +156,7 @@ export class AuthService {
 			const payload = await this.jwtService.verifyAsync<ResetPasswordPayload>(
 				resetPasswordDto.token,
 				{
-					secret: this.configService.get<string>('jwt.secret'),
+					secret: this.configService.get<string>('jwt.secret') || this.configService.get<string>('JWT_SECRET'),
 				},
 			);
 
@@ -151,14 +164,22 @@ export class AuthService {
 				throw new UnauthorizedException('Invalid token type');
 			}
 
-			const user = await this.authRepository.findUserById(payload.sub);
-
-			if (!user) {
-				throw new UnauthorizedException('User not found');
-			}
-
 			const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
-			await this.authRepository.updatePassword(user.id, hashedPassword);
+
+			if (payload.accountType === 'admin') {
+				const admin = await this.prismaService.admin.findUnique({ where: { id: payload.sub }});
+				if (!admin) throw new UnauthorizedException('Admin not found');
+				
+				await this.prismaService.admin.update({
+					where: { id: payload.sub },
+					data: { password: hashedPassword }
+				});
+			} else {
+				const user = await this.authRepository.findUserById(payload.sub);
+				if (!user) throw new UnauthorizedException('User not found');
+				
+				await this.authRepository.updatePassword(user.id, hashedPassword);
+			}
 
 			return {
 				message: 'Password reset successfully',
@@ -171,11 +192,12 @@ export class AuthService {
 		}
 	}
 
-	private generateResetPasswordToken(user: User): string {
+	private generateResetPasswordToken(account: User | any, accountType: 'user' | 'admin' = 'user'): string {
 		const payload: ResetPasswordPayload = {
-			sub: user.id,
-			email: user.email,
+			sub: account.id,
+			email: account.email,
 			type: 'reset-password',
+			accountType,
 		};
 
 		return this.jwtService.sign(payload, {
