@@ -427,6 +427,7 @@ model Feature {
 model SubscriptionFeature {
   subscription_id Int
   feature_id      Int
+  limit_value     Int?     // limit for this feature per plan
 
   subscription Subscription @relation(fields: [subscription_id], references: [id])
   feature      Feature      @relation(fields: [feature_id], references: [id])
