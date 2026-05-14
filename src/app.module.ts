@@ -9,6 +9,8 @@ import { RoleModule } from './modules/roles/role.module';
 import { SubscriptionModule } from './modules/subscriptions/subscription.module';
 import { CustomerModule } from './modules/customers/customer.module';
 import { TenantModule } from './modules/tenants/tenant.module';
+import { SubscriptionPurchaseModule } from './modules/subscriptionPurchase/subscription-purchase.module';
+import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
   imports: [
@@ -18,6 +20,7 @@ import { TenantModule } from './modules/tenants/tenant.module';
       load: appConfigurations,
       envFilePath: [`.env.${process.env.NODE_ENV}`, '.env'],
     }),
+    ScheduleModule.forRoot(),
     CommonModule,
     DatabaseModule,
     AuthModule,
@@ -25,8 +28,7 @@ import { TenantModule } from './modules/tenants/tenant.module';
     RoleModule,
     SubscriptionModule,
     CustomerModule,
-    TenantModule,
-  ],
+    TenantModule,    SubscriptionPurchaseModule,  ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
 })
