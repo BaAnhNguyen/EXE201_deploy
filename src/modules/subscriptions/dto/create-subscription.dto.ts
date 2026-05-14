@@ -19,7 +19,13 @@ export class CreateSubscriptionDto {
   @IsNotEmpty()
   billing_cycle: string;
 
-  @IsBoolean()
   @IsOptional()
+  @IsBoolean()
   is_active?: boolean;
+
+  @IsOptional()
+  @IsNumber()
+  @Type(() => Number)
+  max_shops?: number; // Added to define limit via API
 }
+

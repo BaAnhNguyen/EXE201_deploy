@@ -10,6 +10,7 @@ import { SubscriptionModule } from './modules/subscriptions/subscription.module'
 import { CustomerModule } from './modules/customers/customer.module';
 import { TenantModule } from './modules/tenants/tenant.module';
 import { SubscriptionPurchaseModule } from './modules/subscriptionPurchase/subscription-purchase.module';
+import { FeatureModule } from './modules/features/feature.module';
 import { ScheduleModule } from '@nestjs/schedule';
 
 @Module({
@@ -27,6 +28,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     AdminModule,
     RoleModule,
     SubscriptionModule,
+    FeatureModule,
     CustomerModule,
     TenantModule,    SubscriptionPurchaseModule,  ],
   controllers: [], // Để trống vì đã xóa AppController
