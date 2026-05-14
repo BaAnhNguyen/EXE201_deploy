@@ -6,11 +6,11 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { AdminOnlyGuard } from '../../common/guards/admin-only.guard';
 
 @Controller('subscriptions')
-@UseGuards(JwtAuthGuard, AdminOnlyGuard)
 export class SubscriptionController {
   constructor(private readonly subscriptionService: SubscriptionService) {}
 
   @Post()
+  @UseGuards(JwtAuthGuard, AdminOnlyGuard)
   create(@Body() createSubscriptionDto: CreateSubscriptionDto) {
     return this.subscriptionService.create(createSubscriptionDto);
   }
@@ -26,16 +26,19 @@ export class SubscriptionController {
   }
 
   @Patch(':id')
+  @UseGuards(JwtAuthGuard, AdminOnlyGuard)
   update(@Param('id') id: string, @Body() updateSubscriptionDto: UpdateSubscriptionDto) {
     return this.subscriptionService.update(+id, updateSubscriptionDto);
   }
 
   @Patch(':id/activate')
+  @UseGuards(JwtAuthGuard, AdminOnlyGuard)
   activate(@Param('id') id: string) {
     return this.subscriptionService.activate(+id);
   }
 
   @Patch(':id/deactivate')
+  @UseGuards(JwtAuthGuard, AdminOnlyGuard)
   deactivate(@Param('id') id: string) {
     return this.subscriptionService.deactivate(+id);
   }
