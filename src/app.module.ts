@@ -12,6 +12,7 @@ import { TenantModule } from './modules/tenants/tenant.module';
 import { SubscriptionPurchaseModule } from './modules/subscriptionPurchase/subscription-purchase.module';
 import { FeatureModule } from './modules/features/feature.module';
 import { ScheduleModule } from '@nestjs/schedule';
+import { ShopModule } from './modules/shops/shop.module';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { ScheduleModule } from '@nestjs/schedule';
     SubscriptionModule,
     FeatureModule,
     CustomerModule,
-    TenantModule,    SubscriptionPurchaseModule,  ],
+    TenantModule,    SubscriptionPurchaseModule, ShopModule ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
 })
