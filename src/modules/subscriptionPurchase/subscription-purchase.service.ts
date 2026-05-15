@@ -194,7 +194,7 @@ export class SubscriptionPurchaseService {
 
           const current_period_end = this.calculateEndDate(pending.subscription.billing_cycle);
 
-          await tx.tenantSubscription.create({
+          const tenantSubscription = await tx.tenantSubscription.create({
             data: {
               tenant_id: tenant.id,
               subscription_id: pending.subscription_id,
@@ -202,6 +202,15 @@ export class SubscriptionPurchaseService {
               end_date: current_period_end,
               is_expired: false
             },
+          });
+
+          await tx.subscriptionPayment.create({
+            data: {
+              sub_tenant_id: tenantSubscription.id,
+              method: 'PAYOS',
+              amount: pending.subscription.price,
+              payment_status: 'PAID'
+            }
           });
 
           await tx.pendingSubscription.update({
