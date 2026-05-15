@@ -26,11 +26,11 @@ model Admin {
   created_at DateTime  @default(now())
 
   // Self-reference: an Admin can be managed by another Admin
-  manager_id      Int?
-  managed_by      Admin?  @relation("AdminHierarchy", fields: [manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  managed_admins  Admin[] @relation("AdminHierarchy") // tui note lại chỗ này là "AdminHierarchy" chỉ là cái tên để mai mốt 
-                                                      //query cho dễ, kiểu đặt cho có thôi
-  tenants Tenant[]
+  manager_id     Int?
+  managed_by     Admin?   @relation("AdminHierarchy", fields: [manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  managed_admins Admin[]  @relation("AdminHierarchy") // tui note lại chỗ này là "AdminHierarchy" chỉ là cái tên để mai mốt 
+  //query cho dễ, kiểu đặt cho có thôi
+  tenants        Tenant[]
 
   @@map("admins")
 }
@@ -40,22 +40,22 @@ model Admin {
 // ========================================
 
 model Tenant {
-  id                    Int      @id @default(autoincrement())
-  admin_id              Int? // FK to Admin who manages this tenant
-  tenant_name           String
-  tax_percentage        Decimal? @db.Decimal(5, 2)
-  loyal_point_per_unit  Decimal? @db.Decimal(10, 4) // points earned per currency unit
-  is_active             Boolean  @default(true)
-  created_at            DateTime @default(now())
-  update_at             DateTime @updatedAt
+  id                   Int      @id @default(autoincrement())
+  admin_id             Int? // FK to Admin who manages this tenant
+  tenant_name          String
+  tax_percentage       Decimal? @db.Decimal(5, 2)
+  loyal_point_per_unit Decimal? @db.Decimal(10, 4) // points earned per currency unit
+  is_active            Boolean  @default(true)
+  created_at           DateTime @default(now())
+  update_at            DateTime @updatedAt
 
-  admin                 Admin?             @relation(fields: [admin_id], references: [id])
-  shops                 Shop[]
-  users                 User[]
-  customers             Customer[]
-  product_categories    ProductCategory[]
-  ingredients           Ingredient[]
-  tenant_subscriptions  TenantSubscription[]
+  admin                Admin?               @relation(fields: [admin_id], references: [id])
+  shops                Shop[]
+  users                User[]
+  customers            Customer[]
+  product_categories   ProductCategory[]
+  ingredients          Ingredient[]
+  tenant_subscriptions TenantSubscription[]
 
   @@map("tenants")
 }
@@ -80,7 +80,7 @@ model User {
   tenant_id  Int?
   shop_id    Int?
   role_id    Int?
-  username   String @unique
+  username   String    @unique
   email      String    @unique
   password   String
   avatar     String?
@@ -118,11 +118,11 @@ model ShopOwner {
   is_active        Boolean  @default(true)
   created_at       DateTime @default(now())
 
-  user    User      @relation(fields: [user_id], references: [id])
-  shop    Shop?     @relation(fields: [shop_id], references: [id])
+  user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  shop Shop? @relation(fields: [shop_id], references: [id])
 
   // Self-reference for owner hierarchy
-  managed_by    ShopOwner?  @relation("ShopOwnerHierarchy", fields: [owner_manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  managed_by     ShopOwner?  @relation("ShopOwnerHierarchy", fields: [owner_manager_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
   managed_owners ShopOwner[] @relation("ShopOwnerHierarchy")
 
   @@map("shop_owners")
@@ -138,7 +138,7 @@ model Shop {
   created_at DateTime @default(now())
   update_at  DateTime @updatedAt
 
-  tenant                  Tenant                  @relation(fields: [tenant_id], references: [id])
+  tenant                  Tenant                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   users                   User[]
   shop_owners             ShopOwner[]
   shifts                  Shift[]
@@ -156,7 +156,7 @@ model Shift {
   end_time     DateTime?
   shift_status String?
 
-  shop           Shop         @relation(fields: [shop_id], references: [id])
+  shop           Shop           @relation(fields: [shop_id], references: [id])
   orders         Orders[]
   shift_cashiers ShiftCashier[]
 
@@ -187,7 +187,7 @@ model Customer {
   loyalty_point Int      @default(0)
   created_at    DateTime @default(now())
 
-  tenant                  Tenant                  @relation(fields: [tenant_id], references: [id])
+  tenant                  Tenant                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   orders                  Orders[]
   merchandise_redemptions MerchandiseRedemption[]
 
@@ -205,10 +205,10 @@ model ProductCategory {
   category_name   String
   is_active       Boolean @default(true)
 
-  tenant     Tenant           @relation(fields: [tenant_id], references: [id])
-  parent     ProductCategory?  @relation("CategoryHierarchy", fields: [par_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children   ProductCategory[] @relation("CategoryHierarchy")
-  products   Product[]
+  tenant   Tenant            @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [par_category_id], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children ProductCategory[] @relation("CategoryHierarchy")
+  products Product[]
 
   @@map("product_categories")
 }
@@ -227,8 +227,8 @@ model Product {
   created_at   DateTime @default(now())
   updated_at   DateTime @updatedAt
 
-  category           ProductCategory    @relation(fields: [category_id], references: [id])
-  order_items        OrderItem[]
+  category            ProductCategory     @relation(fields: [category_id], references: [id])
+  order_items         OrderItem[]
   ingredient_products IngredientProduct[]
 
   @@map("products")
@@ -248,7 +248,7 @@ model Ingredient {
   created_at  DateTime @default(now())
   update_at   DateTime @updatedAt
 
-  tenant              Tenant              @relation(fields: [tenant_id], references: [id])
+  tenant              Tenant              @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
   ingredient_products IngredientProduct[]
   inventory_items     InventoryItem[]
 
@@ -270,13 +270,13 @@ model IngredientProduct {
 }
 
 model Inventory {
-  id                 Int       @id @default(autoincrement())
-  shop_id            Int       @unique
-  current_quantity   Int       @default(0)
-  minimum_threshold  Int?
-  reorder_quantity   Int?
-  last_restock_at    DateTime?
-  update_at          DateTime  @updatedAt
+  id                Int       @id @default(autoincrement())
+  shop_id           Int       @unique
+  current_quantity  Int       @default(0)
+  minimum_threshold Int?
+  reorder_quantity  Int?
+  last_restock_at   DateTime?
+  update_at         DateTime  @updatedAt
 
   shop            Shop            @relation(fields: [shop_id], references: [id])
   inventory_items InventoryItem[]
@@ -293,8 +293,8 @@ model InventoryItem {
   actual_quantity    Int?     @default(0) // Physically counted
   updated_at         DateTime @updatedAt
 
-  ingredient       Ingredient       @relation(fields: [ingredient_id], references: [id])
-  inventory        Inventory        @relation(fields: [inventory_id], references: [id])
+  ingredient Ingredient @relation(fields: [ingredient_id], references: [id])
+  inventory  Inventory  @relation(fields: [inventory_id], references: [id])
 
   @@map("inventory_items")
 }
@@ -323,11 +323,11 @@ model Merchandise {
 }
 
 model MerchandiseRedemption {
-  id             Int      @id @default(autoincrement())
-  customer_id    Int
-  merchandise_id Int
-  shop_id        Int
-  point_spent    Int
+  id              Int      @id @default(autoincrement())
+  customer_id     Int
+  merchandise_id  Int
+  shop_id         Int
+  point_spent     Int
   redemption_date DateTime @default(now())
 
   customer    Customer    @relation(fields: [customer_id], references: [id])
@@ -427,7 +427,7 @@ model Feature {
 model SubscriptionFeature {
   subscription_id Int
   feature_id      Int
-  limit_value     Int?     // limit for this feature per plan
+  limit_value     Int? // limit for this feature per plan
 
   subscription Subscription @relation(fields: [subscription_id], references: [id])
   feature      Feature      @relation(fields: [feature_id], references: [id])
@@ -435,10 +435,11 @@ model SubscriptionFeature {
   @@id([subscription_id, feature_id])
   @@map("subscription_features")
 }
+
 model TenantSubscription {
   id                 Int       @id @default(autoincrement())
   subscription_id    Int
-  tenant_id          Int
+  tenant_id          Int?
   number_of_renewals Int?      @default(0)
   start_date         DateTime  @default(now())
   end_date           DateTime?
@@ -447,19 +448,19 @@ model TenantSubscription {
   is_expired         Boolean   @default(false)
 
   subscription          Subscription          @relation(fields: [subscription_id], references: [id])
-  tenant                Tenant                @relation(fields: [tenant_id], references: [id])
+  tenant                Tenant?               @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
   subscription_payments SubscriptionPayment[]
 
   @@map("tenant_subscriptions")
 }
 
 model SubscriptionPayment {
-  id                 Int      @id @default(autoincrement())
-  sub_tenant_id      Int
-  method             String
-  amount             Decimal  @db.Decimal(10, 2)
-  created_at         DateTime @default(now())
-  payment_status     String
+  id             Int      @id @default(autoincrement())
+  sub_tenant_id  Int
+  method         String
+  amount         Decimal  @db.Decimal(10, 2)
+  created_at     DateTime @default(now())
+  payment_status String
 
   tenant_subscription TenantSubscription @relation(fields: [sub_tenant_id], references: [id])
 
@@ -467,16 +468,16 @@ model SubscriptionPayment {
 }
 
 model PendingSubscription {
-  id              Int      @id @default(autoincrement())
-  subscription_id Int
-  username        String
-  email           String
-  password        String   
-  tenant_name     String
-  payos_order_code String  @unique // mã đơn hàng PayOS
-  status          String   @default("PENDING") // PENDING | PAID | CANCELLED | EXPIRED
-  expires_at      DateTime // created_at + 2 phút
-  created_at      DateTime @default(now())
+  id               Int      @id @default(autoincrement())
+  subscription_id  Int
+  username         String
+  email            String
+  password         String
+  tenant_name      String
+  payos_order_code String   @unique // mã đơn hàng PayOS
+  status           String   @default("PENDING") // PENDING | PAID | CANCELLED | EXPIRED
+  expires_at       DateTime // created_at + 2 phút
+  created_at       DateTime @default(now())
 
   subscription Subscription @relation(fields: [subscription_id], references: [id])
 

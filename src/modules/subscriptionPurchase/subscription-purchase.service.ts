@@ -259,6 +259,30 @@ export class SubscriptionPurchaseService {
     });
   }
 
+  async cleanupExpiredTenants() {
+    const expiredTenants = await this.prisma.tenant.findMany({
+      where: {
+        tenant_subscriptions: {
+          some: { is_expired: true }, 
+          every: {
+            is_expired: true
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    if (expiredTenants.length > 0) {
+      const tenantIds = expiredTenants.map(t => t.id);
+
+      await this.prisma.tenant.deleteMany({
+        where: { id: { in: tenantIds } },
+      });
+
+      console.log(`Cleaned up ${expiredTenants.length} expired tenants and their information.`);
+    }
+  }
+
   async checkStatus(orderCode: string) {
     const pending = await this.prisma.pendingSubscription.findUnique({
       where: { payos_order_code: orderCode },
@@ -267,6 +291,21 @@ export class SubscriptionPurchaseService {
     if (!pending) throw new NotFoundException();
     return { status: pending.status };
   }
+
+  async updateExpiredSubscriptions() {
+    const result = await this.prisma.tenantSubscription.updateMany({
+      where: {
+        end_date: { lt: new Date() },
+        is_expired: false,
+      },
+      data: {
+        is_expired: true,
+      },
+    });
+    console.log(`Updated ${result.count} expired subscriptions.`);
+    return result;
+  }
+
   // Thêm vào subscription-purchase.service.ts
 async confirmWebhook() {
   const PAYOS_CLIENT_ID = this.configService.get<string>('payos.clientId');
