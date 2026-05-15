@@ -20,6 +20,12 @@ export class SubscriptionController {
     return this.subscriptionService.findAll();
   }
 
+  @Get('stats')
+  @UseGuards(JwtAuthGuard, AdminOnlyGuard)
+  getSubscriptionStats() {
+    return this.subscriptionService.getSubscriptionStats();
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.subscriptionService.findOne(+id);

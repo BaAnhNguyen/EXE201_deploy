@@ -83,4 +83,42 @@ export class SubscriptionService {
     await this.findOne(id); // Check existence
     return this.subscriptionRepository.updateStatus(id, false);
   }
+
+  async getSubscriptionStats() {
+    // Thống kê số lượng mua theo từng gói subscription
+    const packageStats = await this.prisma.subscription.findMany({
+      select: {
+        id: true,
+        package_code: true,
+        description: true,
+        price: true,
+        _count: {
+          select: {
+            tenant_subscriptions: true,
+          },
+        },
+      },
+    });
+
+    // Tính tổng doanh thu từ tất cả các khoản thanh toán thành công
+    const revenueAggr = await this.prisma.subscriptionPayment.aggregate({
+      _sum: {
+        amount: true,
+      },
+      where: {
+        payment_status: 'PAID',
+      },
+    });
+
+    return {
+      totalRevenue: revenueAggr._sum.amount || 0,
+      packageStats: packageStats.map(pkg => ({
+        id: pkg.id,
+        package_code: pkg.package_code,
+        description: pkg.description,
+        price: pkg.price,
+        total_purchased: pkg._count.tenant_subscriptions,
+      })),
+    };
+  }
 }
