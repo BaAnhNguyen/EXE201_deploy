@@ -9,5 +9,7 @@ export class SubscriptionCleanupTask {
   @Cron(CronExpression.EVERY_MINUTE)
   async handleCron() {
     await this.purchaseService.cleanupExpiredPending();
+    await this.purchaseService.updateExpiredSubscriptions();
+    await this.purchaseService.cleanupExpiredTenants();
   }
 }
