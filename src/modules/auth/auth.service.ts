@@ -218,7 +218,7 @@ export class AuthService {
 		return this.jwtService.signAsync(payload);
 	}
 
-	private mapUserResponse(user: User) {
+	private mapUserResponse(user: any) {
 		return {
 			id: user.id,
 			username: user.username,
@@ -227,6 +227,7 @@ export class AuthService {
 			phone: user.phone,
 			avatar: user.avatar,
 			role_id: user.role_id,
+			role_code: user?.role?.role_code,
 			tenant_id: user.tenant_id,
 			shop_id: user.shop_id,
 			is_active: user.is_active,
