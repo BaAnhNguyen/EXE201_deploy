@@ -14,11 +14,14 @@ export class AuthRepository {
 		return this.prisma.user.findUnique({ where: { username } });
 	}
 
-	findUserByEmailOrUsername(email: string, username: string): Promise<User | null> {
+	findUserByEmailOrUsername(email: string, username: string) {
 		return this.prisma.user.findFirst({
 			where: {
 				OR: [{ email }, { username }],
 			},
+			include: {
+				role: true,
+			}
 		});
 	}
 
