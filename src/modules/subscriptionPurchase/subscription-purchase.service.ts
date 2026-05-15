@@ -260,12 +260,16 @@ export class SubscriptionPurchaseService {
   }
 
   async cleanupExpiredTenants() {
+    const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+
     const expiredTenants = await this.prisma.tenant.findMany({
       where: {
         tenant_subscriptions: {
-          some: { is_expired: true }, 
+          some: {}, 
           every: {
-            is_expired: true
+            end_date: {
+              lt: fourteenDaysAgo,
+            },
           },
         },
       },
