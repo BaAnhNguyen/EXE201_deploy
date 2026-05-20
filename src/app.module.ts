@@ -14,6 +14,9 @@ import { SubscriptionExtensionModule } from './modules/subscription-extension/su
 import { FeatureModule } from './modules/features/feature.module';
 import { ScheduleModule } from '@nestjs/schedule';
 import { ShopModule } from './modules/shops/shop.module';
+import { ProductModule } from './modules/products/product.module';
+import { IngredientModule } from './modules/ingredients/ingredient.module';
+import { InventoryModule } from './modules/inventories/inventory.module';
 
 @Module({
   imports: [
@@ -36,6 +39,9 @@ import { ShopModule } from './modules/shops/shop.module';
     SubscriptionPurchaseModule,
     SubscriptionExtensionModule,
     ShopModule,
+    ProductModule,
+    IngredientModule,
+    InventoryModule,
   ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
