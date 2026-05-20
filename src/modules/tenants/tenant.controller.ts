@@ -1,7 +1,20 @@
-﻿import { Controller, Get, Post, Body, Patch, Param, ParseIntPipe, Delete } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  ParseIntPipe,
+  Delete,
+  Req,
+  UseGuards,
+  BadRequestException,
+} from '@nestjs/common';
 import { TenantService } from './tenant.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @Controller('tenants')
 export class TenantController {
@@ -15,6 +28,16 @@ export class TenantController {
   @Get()
   findAll() {
     return this.tenantService.findAll();
+  }
+
+  @Get('me/subscription')
+  @UseGuards(JwtAuthGuard)
+  getMySubscription(@Req() req: { user?: { tenant_id?: number } }) {
+    const tenantId = req.user?.tenant_id;
+    if (!tenantId) {
+      throw new BadRequestException('Không xác định được tenant từ token');
+    }
+    return this.tenantService.getMySubscription(tenantId);
   }
 
   @Get(':id')
