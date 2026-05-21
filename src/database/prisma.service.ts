@@ -5,6 +5,7 @@ import {
   Logger,
   INestApplication,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaClient, Prisma } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
@@ -18,11 +19,12 @@ export class PrismaService
 {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor() {
+  constructor(private readonly configService: ConfigService) {
+    // Use process.env directly since it's loaded before NestJS initialization
     const baseUrl = process.env.DATABASE_URL;
 
     if (!baseUrl) {
-      throw new Error('DATABASE_URL is not defined');
+      throw new Error('DATABASE_URL is not defined in environment variables');
     }
 
     const connectionString =
@@ -30,11 +32,11 @@ export class PrismaService
         ? baseUrl
         : `${baseUrl}${baseUrl.includes('?') ? '&' : '?'}connect_timeout=30`;
 
+    const poolMax = Number(process.env.DB_POOL_MAX) || 10;
 
-     
     const pool = new Pool({
         connectionString,
-        max: Number(process.env.DB_POOL_MAX) || 10,
+        max: poolMax,
         idleTimeoutMillis: 30000,
         connectionTimeoutMillis: 30000,
     });
