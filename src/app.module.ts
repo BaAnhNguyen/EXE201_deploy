@@ -17,6 +17,8 @@ import { ShopModule } from './modules/shops/shop.module';
 import { ProductModule } from './modules/products/product.module';
 import { IngredientModule } from './modules/ingredients/ingredient.module';
 import { InventoryModule } from './modules/inventories/inventory.module';
+import { ShiftTemplateModule } from './modules/shift-templates/shift-template.module';
+import { ShiftModule } from './modules/shifts/shift.module';
 
 @Module({
   imports: [
@@ -42,6 +44,8 @@ import { InventoryModule } from './modules/inventories/inventory.module';
     ProductModule,
     IngredientModule,
     InventoryModule,
+    ShiftTemplateModule,
+    ShiftModule,
   ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService

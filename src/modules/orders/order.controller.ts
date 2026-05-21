@@ -16,7 +16,7 @@ export class OrderController {
 
   // POST /shops/:shopId/orders
   @Post()
-  @Roles('CASHIER', 'SHOP_OWNER')
+  @Roles('CASHIER', 'SHOPOWNER')
   create(
     @Param('shopId', ParseIntPipe) shopId: number,
     @Body() dto: CreateOrderDto,
@@ -27,7 +27,7 @@ export class OrderController {
 
   // GET /shops/:shopId/orders
   @Get()
-  @Roles('CASHIER', 'SHOP_OWNER')
+  @Roles('CASHIER', 'SHOPOWNER')
   findAll(
     @Param('shopId', ParseIntPipe) shopId: number,
     @Req() req: any,
@@ -37,7 +37,7 @@ export class OrderController {
 
   // GET /shops/:shopId/orders/:id
   @Get(':id')
-  @Roles('CASHIER', 'SHOP_OWNER')
+  @Roles('CASHIER', 'SHOPOWNER')
   findOne(
     @Param('shopId', ParseIntPipe) shopId: number,
     @Param('id', ParseIntPipe) id: number,
@@ -48,7 +48,7 @@ export class OrderController {
 
   // PATCH /shops/:shopId/orders/:id
   @Patch(':id')
-  @Roles('CASHIER', 'SHOP_OWNER')
+  @Roles('CASHIER', 'SHOPOWNER')
   update(
     @Param('shopId', ParseIntPipe) shopId: number,
     @Param('id', ParseIntPipe) id: number,

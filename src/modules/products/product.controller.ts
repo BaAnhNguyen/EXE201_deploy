@@ -15,25 +15,25 @@ export class ProductController {
   constructor(private readonly productService: ProductService) {}
 
   @Post()
-  @Roles('SHOP_OWNER')
+  @Roles('SHOPOWNER')
   create(@Body() dto: CreateProductDto, @Req() req: any) {
     return this.productService.create(dto, req.user.tenant_id);
   }
 
   @Get()
-  @Roles('SHOP_OWNER', 'CASHIER')
+  @Roles('SHOPOWNER', 'CASHIER')
   findAll(@Req() req: any) {
     return this.productService.findAll(req.user.tenant_id);
   }
 
   @Get(':id')
-  @Roles('SHOP_OWNER', 'CASHIER')
+  @Roles('SHOPOWNER', 'CASHIER')
   findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.productService.findOne(id, req.user.tenant_id);
   }
 
   @Patch(':id')
-  @Roles('SHOP_OWNER')
+  @Roles('SHOPOWNER')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateProductDto,
@@ -43,13 +43,13 @@ export class ProductController {
   }
 
   @Patch(':id/activate')
-  @Roles('SHOP_OWNER')
+  @Roles('SHOPOWNER')
   activate(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.productService.activate(id, req.user.tenant_id);
   }
 
   @Patch(':id/deactivate')
-  @Roles('SHOP_OWNER')
+  @Roles('SHOPOWNER')
   deactivate(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.productService.deactivate(id, req.user.tenant_id);
   }
