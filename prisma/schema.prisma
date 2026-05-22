@@ -149,18 +149,36 @@ model Shop {
   @@map("shops")
 }
 
+// Sửa lại model Shift hiện tại
+
 model Shift {
   id           Int       @id @default(autoincrement())
   shop_id      Int
-  start_time   DateTime
-  end_time     DateTime?
+  template_id  Int // FK vào ShiftTemplate
+  start_time   String
+  end_time     String?
   shift_status String?
 
   shop           Shop           @relation(fields: [shop_id], references: [id])
+  template       ShiftTemplate  @relation(fields: [template_id], references: [id])
   orders         Orders[]
   shift_cashiers ShiftCashier[]
 
   @@map("shifts")
+}
+
+// Thêm vào sau model ShiftCashier
+
+model ShiftTemplate {
+  id         Int     @id @default(autoincrement())
+  name       String // "Ca sáng", "Ca chiều"...
+  start_time String // "06:00"
+  end_time   String // "14:00"
+  is_active  Boolean @default(true)
+
+  shifts Shift[]
+
+  @@map("shift_templates")
 }
 
 model ShiftCashier {

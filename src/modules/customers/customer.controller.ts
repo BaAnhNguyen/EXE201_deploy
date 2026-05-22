@@ -7,7 +7,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 // @UseGuards(JwtAuthGuard, RolesGuard)
-// @Roles('SHOP_OWNER', 'CASHIER')
+// @Roles('SHOPOWNER', 'CASHIER')
 @Controller('customers')
 export class CustomerController {
   constructor(private readonly customerService: CustomerService) {}

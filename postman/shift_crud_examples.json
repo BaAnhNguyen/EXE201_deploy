@@ -1,0 +1,73 @@
+{
+  "POST /shops/:shopId/shifts": {
+    "request": {
+      "start_time": "2026-05-21T08:00:00.000Z",
+      "end_time": "2026-05-21T16:00:00.000Z",
+      "shift_status": "OPEN"
+    },
+    "response": {
+      "id": 123,
+      "gid": "shift:123",
+      "shop_id": 1,
+      "start_time": "2026-05-21T08:00:00.000Z",
+      "end_time": "2026-05-21T16:00:00.000Z",
+      "shift_status": "OPEN",
+      "created_at": "2026-05-21T07:50:00.000Z"
+    }
+  },
+  "GET /shops/:shopId/shifts": {
+    "response": [
+      {
+        "id": 123,
+        "gid": "shift:123",
+        "shop_id": 1,
+        "start_time": "2026-05-21T08:00:00.000Z",
+        "end_time": "2026-05-21T16:00:00.000Z",
+        "shift_status": "OPEN",
+        "created_at": "2026-05-21T07:50:00.000Z"
+      },
+      {
+        "id": 122,
+        "gid": "shift:122",
+        "shop_id": 1,
+        "start_time": "2026-05-20T08:00:00.000Z",
+        "end_time": "2026-05-20T16:00:00.000Z",
+        "shift_status": "CLOSED",
+        "created_at": "2026-05-20T07:50:00.000Z"
+      }
+    ]
+  },
+  "GET /shops/:shopId/shifts/:id": {
+    "response": {
+      "id": 123,
+      "gid": "shift:123",
+      "shop_id": 1,
+      "start_time": "2026-05-21T08:00:00.000Z",
+      "end_time": "2026-05-21T16:00:00.000Z",
+      "shift_status": "OPEN",
+      "created_at": "2026-05-21T07:50:00.000Z"
+    }
+  },
+  "PATCH /shops/:shopId/shifts/:id": {
+    "request": {
+      "end_time": "2026-05-21T16:30:00.000Z",
+      "shift_status": "CLOSED"
+    },
+    "response": {
+      "id": 123,
+      "gid": "shift:123",
+      "shop_id": 1,
+      "start_time": "2026-05-21T08:00:00.000Z",
+      "end_time": "2026-05-21T16:30:00.000Z",
+      "shift_status": "CLOSED",
+      "updated_at": "2026-05-21T16:30:01.000Z"
+    }
+  },
+  "DELETE /shops/:shopId/shifts/:id": {
+    "response": {
+      "id": 123,
+      "gid": "shift:123",
+      "deleted": true
+    }
+  }
+}
