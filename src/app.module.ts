@@ -19,7 +19,8 @@ import { IngredientModule } from './modules/ingredients/ingredient.module';
 import { InventoryModule } from './modules/inventories/inventory.module';
 import { ShiftTemplateModule } from './modules/shift-templates/shift-template.module';
 import { ShiftModule } from './modules/shifts/shift.module';
-
+import { ProductCategoryModule } from './modules/product-categories/product-category.module';
+import { OrderModule } from './modules/orders/order.module';
 @Module({
   imports: [
     // Load .env
@@ -42,10 +43,12 @@ import { ShiftModule } from './modules/shifts/shift.module';
     SubscriptionExtensionModule,
     ShopModule,
     ProductModule,
+    ProductCategoryModule,
     IngredientModule,
     InventoryModule,
     ShiftTemplateModule,
     ShiftModule,
+    OrderModule
   ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
