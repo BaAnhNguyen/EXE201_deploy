@@ -56,35 +56,55 @@ export class ProductCategoryRepository {
     });
   }
 
-  async update(id: number, data: Prisma.ProductCategoryUpdateInput) {
-    return this.prisma.productCategory.update({
-      where: { id },
-      data,
-      include: {
-        parent: true,
-        children: {
-          include: {
-            children: true,
-            parent: true,
+  async update(id: number, tenantId: number, data: Prisma.ProductCategoryUpdateInput) {
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.productCategory.updateMany({
+        where: { id, tenant_id: tenantId },
+        data,
+      });
+
+      if (result.count === 0) {
+        return null;
+      }
+
+      return tx.productCategory.findFirst({
+        where: { id, tenant_id: tenantId },
+        include: {
+          parent: true,
+          children: {
+            include: {
+              children: true,
+              parent: true,
+            },
           },
         },
-      },
+      });
     });
   }
 
-  async softDelete(id: number) {
-    return this.prisma.productCategory.update({
-      where: { id },
-      data: { is_active: false },
-      include: {
-        parent: true,
-        children: {
-          include: {
-            children: true,
-            parent: true,
+  async softDelete(id: number, tenantId: number) {
+    return this.prisma.$transaction(async (tx) => {
+      const result = await tx.productCategory.updateMany({
+        where: { id, tenant_id: tenantId },
+        data: { is_active: false },
+      });
+
+      if (result.count === 0) {
+        return null;
+      }
+
+      return tx.productCategory.findFirst({
+        where: { id, tenant_id: tenantId },
+        include: {
+          parent: true,
+          children: {
+            include: {
+              children: true,
+              parent: true,
+            },
           },
         },
-      },
+      });
     });
   }
 }

@@ -54,11 +54,20 @@ export class ProductCategoryService {
       }
     }
 
-    return this.productCategoryRepository.update(id, dto);
+    const updated = await this.productCategoryRepository.update(id, tenantId, dto);
+    if (!updated) {
+      throw new NotFoundException(`Product category #${id} not found`);
+    }
+    return updated;
   }
 
   async remove(id: number, tenantId: number) {
     await this.findOne(id, tenantId);
-    return this.productCategoryRepository.softDelete(id);
+
+    const removed = await this.productCategoryRepository.softDelete(id, tenantId);
+    if (!removed) {
+      throw new NotFoundException(`Product category #${id} not found`);
+    }
+    return removed;
   }
 }
