@@ -85,40 +85,77 @@ export class SubscriptionService {
   }
 
   async getSubscriptionStats() {
-    // Thống kê số lượng mua theo từng gói subscription
-    const packageStats = await this.prisma.subscription.findMany({
+    // ── 1. Per-package: tenant count + payments + renewals ──────────────
+    const packages = await this.prisma.subscription.findMany({
       select: {
         id: true,
         package_code: true,
         description: true,
         price: true,
         _count: {
+          select: { tenant_subscriptions: true },
+        },
+        tenant_subscriptions: {
           select: {
-            tenant_subscriptions: true,
+            number_of_renewals: true,
+            subscription_payments: {
+              where: { payment_status: 'PAID' },
+              select: { amount: true },
+            },
           },
         },
       },
     });
 
-    // Tính tổng doanh thu từ tất cả các khoản thanh toán thành công
+    // ── 2. Tổng doanh thu + tổng lượt thanh toán ──────────────────────
     const revenueAggr = await this.prisma.subscriptionPayment.aggregate({
-      _sum: {
-        amount: true,
-      },
-      where: {
-        payment_status: 'PAID',
-      },
+      _sum: { amount: true },
+      _count: true,
+      where: { payment_status: 'PAID' },
     });
 
-    return {
-      totalRevenue: revenueAggr._sum.amount || 0,
-      packageStats: packageStats.map(pkg => ({
+    // ── 3. Tổng lượt gia hạn ──────────────────────────────────────────
+    const renewalAggr = await this.prisma.tenantSubscription.aggregate({
+      _sum: { number_of_renewals: true },
+    });
+
+    // ── 4. Map per-package ─────────────────────────────────────────────
+    const packageStats = packages.map(pkg => {
+      const renewals = pkg.tenant_subscriptions.reduce(
+        (sum, ts) => sum + (ts.number_of_renewals ?? 0),
+        0,
+      );
+      const revenue = pkg.tenant_subscriptions.reduce(
+        (sum, ts) =>
+          sum +
+          ts.subscription_payments.reduce(
+            (pSum, p) => pSum + Number(p.amount),
+            0,
+          ),
+        0,
+      );
+      const paymentCount = pkg.tenant_subscriptions.reduce(
+        (sum, ts) => sum + ts.subscription_payments.length,
+        0,
+      );
+
+      return {
         id: pkg.id,
         package_code: pkg.package_code,
         description: pkg.description,
         price: pkg.price,
         total_purchased: pkg._count.tenant_subscriptions,
-      })),
+        total_renewals: renewals,
+        total_payments: paymentCount,
+        revenue,
+      };
+    });
+
+    return {
+      totalRevenue: revenueAggr._sum.amount || 0,
+      totalPayments: revenueAggr._count || 0,
+      totalRenewals: renewalAggr._sum.number_of_renewals || 0,
+      packageStats,
     };
   }
 }

@@ -56,6 +56,7 @@ model Tenant {
   product_categories   ProductCategory[]
   ingredients          Ingredient[]
   tenant_subscriptions TenantSubscription[]
+  pending_subscriptions PendingSubscription[]
 
   @@map("tenants")
 }
@@ -488,6 +489,8 @@ model SubscriptionPayment {
 model PendingSubscription {
   id               Int      @id @default(autoincrement())
   subscription_id  Int
+  purchase_type    String   @default("NEW") // NEW | RENEW
+  tenant_id        Int? // bắt buộc khi purchase_type = RENEW
   username         String
   email            String
   password         String
@@ -498,6 +501,7 @@ model PendingSubscription {
   created_at       DateTime @default(now())
 
   subscription Subscription @relation(fields: [subscription_id], references: [id])
+  tenant       Tenant?      @relation(fields: [tenant_id], references: [id], onDelete: SetNull)
 
   @@map("pending_subscriptions")
 }

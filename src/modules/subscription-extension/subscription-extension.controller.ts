@@ -1,5 +1,4 @@
-import { Controller, Post, Req, UseGuards } from '@nestjs/common';
-import { SubscriptionExtensionService } from './subscription-extension.service';
+import { BadRequestException, Controller, Post, UseGuards } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
@@ -7,12 +6,11 @@ import { Roles } from '../../common/decorators/roles.decorator';
 @Controller('subscription-extension')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class SubscriptionExtensionController {
-  constructor(private readonly subscriptionExtensionService: SubscriptionExtensionService) {}
-
   @Post('extend')
   @Roles('SHOPOWNER')
-  async extendSubscription(@Req() req: any) {
-    const tenantId = req.user?.tenant_id;
-    return this.subscriptionExtensionService.extendSubscription(tenantId);
+  extendSubscription() {
+    throw new BadRequestException(
+      'Gia hạn phải qua thanh toán PayOS. Dùng POST /subscriptions/purchase/renew/initiate',
+    );
   }
 }
