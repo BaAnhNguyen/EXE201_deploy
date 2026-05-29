@@ -12,15 +12,24 @@ export class ShiftTemplateService {
   ) {}
 
   async create(dto: CreateShiftTemplateDto, tenantId: number) {
-    return this.repo.create({ ...dto, is_active: dto.is_active ?? true });
+    return this.repo.create({
+      tenant_id: tenantId,
+      ...dto,
+      is_active: dto.is_active ?? true,
+    });
   }
 
   async findAll(tenantId: number) {
-    return this.repo.findAll();
+    return this.prisma.shiftTemplate.findMany({
+      where: { tenant_id: tenantId },
+      orderBy: { id: 'desc' },
+    });
   }
 
   async findOne(id: number, tenantId: number) {
-    const item = await this.repo.findById(id);
+    const item = await this.prisma.shiftTemplate.findFirst({
+      where: { id, tenant_id: tenantId },
+    });
     if (!item) throw new NotFoundException(`ShiftTemplate #${id} not found`);
     return item;
   }

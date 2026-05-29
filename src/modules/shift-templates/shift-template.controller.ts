@@ -16,10 +16,11 @@ import { ShiftTemplateService } from './shift-template.service';
 import { CreateShiftTemplateDto } from './dto/create-shift-template.dto';
 import { UpdateShiftTemplateDto } from './dto/update-shift-template.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { AdminOnlyGuard } from 'src/common/guards/admin-only.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 
-@UseGuards(JwtAuthGuard, AdminOnlyGuard)
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('SHOPOWNER')
 @Controller('shift-templates')
 export class ShiftTemplateController {
   constructor(private readonly service: ShiftTemplateService) {}
