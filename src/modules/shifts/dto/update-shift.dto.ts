@@ -1,13 +1,18 @@
-import { IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsInt, IsArray } from 'class-validator';
 
 export class UpdateShiftDto {
   @IsOptional()
   @IsDateString()
-  start_time?: string;
+  shift_date?: string;
 
   @IsOptional()
-  @IsDateString()
-  end_time?: string;
+  @IsInt()
+  template_id?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsInt({ each: true })
+  cashiers?: number[];
 
   @IsOptional()
   @IsString()

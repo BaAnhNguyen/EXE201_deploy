@@ -40,7 +40,7 @@ async function main() {
   for (const sub of subscriptions) {
     let limitValue = 1;
     if (sub.package_code.includes('ULTIMATE')) {
-      limitValue = 3;
+      limitValue = 2;
     }
 
     await prisma.subscriptionFeature.upsert({

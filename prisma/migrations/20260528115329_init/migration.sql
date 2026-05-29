@@ -44,6 +44,7 @@ CREATE TABLE "users" (
     "tenant_id" INTEGER,
     "shop_id" INTEGER,
     "role_id" INTEGER,
+    "username" TEXT NOT NULL,
     "email" TEXT NOT NULL,
     "password" TEXT NOT NULL,
     "avatar" TEXT,
@@ -90,19 +91,24 @@ CREATE TABLE "shops" (
 CREATE TABLE "shifts" (
     "id" SERIAL NOT NULL,
     "shop_id" INTEGER NOT NULL,
-    "start_time" TIMESTAMP(3) NOT NULL,
-    "end_time" TIMESTAMP(3),
+    "cashiers" INTEGER[],
+    "template_id" INTEGER NOT NULL,
+    "shift_date" DATE NOT NULL,
     "shift_status" TEXT,
 
     CONSTRAINT "shifts_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
-CREATE TABLE "shift_cashiers" (
-    "shift_id" INTEGER NOT NULL,
-    "cashier_id" INTEGER NOT NULL,
+CREATE TABLE "shift_templates" (
+    "id" SERIAL NOT NULL,
+    "tenant_id" INTEGER NOT NULL,
+    "name" TEXT NOT NULL,
+    "start_time" TEXT NOT NULL,
+    "end_time" TEXT NOT NULL,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
 
-    CONSTRAINT "shift_cashiers_pkey" PRIMARY KEY ("shift_id","cashier_id")
+    CONSTRAINT "shift_templates_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -198,21 +204,6 @@ CREATE TABLE "inventory_items" (
 );
 
 -- CreateTable
-CREATE TABLE "inventory_traits" (
-    "id" SERIAL NOT NULL,
-    "inventory_item_id" INTEGER NOT NULL,
-    "created_by" INTEGER NOT NULL,
-    "inv_trait_type" TEXT NOT NULL,
-    "direction_sign" TEXT NOT NULL,
-    "quantity" INTEGER NOT NULL,
-    "quantity_before" INTEGER NOT NULL,
-    "quantity_after" INTEGER NOT NULL,
-    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT "inventory_traits_pkey" PRIMARY KEY ("id")
-);
-
--- CreateTable
 CREATE TABLE "merchandises" (
     "id" SERIAL NOT NULL,
     "shop_id" INTEGER NOT NULL,
@@ -290,7 +281,6 @@ CREATE TABLE "subscriptions" (
     "description" TEXT,
     "price" DECIMAL(10,2) NOT NULL,
     "billing_cycle" TEXT NOT NULL,
-    "features" JSONB,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -300,10 +290,29 @@ CREATE TABLE "subscriptions" (
 );
 
 -- CreateTable
+CREATE TABLE "features" (
+    "id" SERIAL NOT NULL,
+    "feature_code" TEXT NOT NULL,
+    "description" TEXT,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+
+    CONSTRAINT "features_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "subscription_features" (
+    "subscription_id" INTEGER NOT NULL,
+    "feature_id" INTEGER NOT NULL,
+    "limit_value" INTEGER,
+
+    CONSTRAINT "subscription_features_pkey" PRIMARY KEY ("subscription_id","feature_id")
+);
+
+-- CreateTable
 CREATE TABLE "tenant_subscriptions" (
     "id" SERIAL NOT NULL,
     "subscription_id" INTEGER NOT NULL,
-    "tenant_id" INTEGER NOT NULL,
+    "tenant_id" INTEGER,
     "number_of_renewals" INTEGER DEFAULT 0,
     "start_date" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "end_date" TIMESTAMP(3),
@@ -326,11 +335,32 @@ CREATE TABLE "subscription_payments" (
     CONSTRAINT "subscription_payments_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "pending_subscriptions" (
+    "id" SERIAL NOT NULL,
+    "subscription_id" INTEGER NOT NULL,
+    "purchase_type" TEXT NOT NULL DEFAULT 'NEW',
+    "tenant_id" INTEGER,
+    "username" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "tenant_name" TEXT NOT NULL,
+    "payos_order_code" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'PENDING',
+    "expires_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "pending_subscriptions_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "admins_email_key" ON "admins"("email");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "roles_role_code_key" ON "roles"("role_code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "users_username_key" ON "users"("username");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "users_email_key" ON "users"("email");
@@ -342,7 +372,16 @@ CREATE UNIQUE INDEX "shop_owners_user_id_key" ON "shop_owners"("user_id");
 CREATE UNIQUE INDEX "products_sku_key" ON "products"("sku");
 
 -- CreateIndex
+CREATE UNIQUE INDEX "inventories_shop_id_key" ON "inventories"("shop_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "subscriptions_package_code_key" ON "subscriptions"("package_code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "features_feature_code_key" ON "features"("feature_code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "pending_subscriptions_payos_order_code_key" ON "pending_subscriptions"("payos_order_code");
 
 -- AddForeignKey
 ALTER TABLE "admins" ADD CONSTRAINT "admins_manager_id_fkey" FOREIGN KEY ("manager_id") REFERENCES "admins"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
@@ -360,7 +399,7 @@ ALTER TABLE "users" ADD CONSTRAINT "users_shop_id_fkey" FOREIGN KEY ("shop_id") 
 ALTER TABLE "users" ADD CONSTRAINT "users_role_id_fkey" FOREIGN KEY ("role_id") REFERENCES "roles"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "shop_owners" ADD CONSTRAINT "shop_owners_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "shop_owners" ADD CONSTRAINT "shop_owners_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "shop_owners" ADD CONSTRAINT "shop_owners_shop_id_fkey" FOREIGN KEY ("shop_id") REFERENCES "shops"("id") ON DELETE SET NULL ON UPDATE CASCADE;
@@ -369,22 +408,22 @@ ALTER TABLE "shop_owners" ADD CONSTRAINT "shop_owners_shop_id_fkey" FOREIGN KEY 
 ALTER TABLE "shop_owners" ADD CONSTRAINT "shop_owners_owner_manager_id_fkey" FOREIGN KEY ("owner_manager_id") REFERENCES "shop_owners"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
 
 -- AddForeignKey
-ALTER TABLE "shops" ADD CONSTRAINT "shops_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "shops" ADD CONSTRAINT "shops_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "shifts" ADD CONSTRAINT "shifts_shop_id_fkey" FOREIGN KEY ("shop_id") REFERENCES "shops"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "shift_cashiers" ADD CONSTRAINT "shift_cashiers_shift_id_fkey" FOREIGN KEY ("shift_id") REFERENCES "shifts"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "shifts" ADD CONSTRAINT "shifts_template_id_fkey" FOREIGN KEY ("template_id") REFERENCES "shift_templates"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "shift_cashiers" ADD CONSTRAINT "shift_cashiers_cashier_id_fkey" FOREIGN KEY ("cashier_id") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "shift_templates" ADD CONSTRAINT "shift_templates_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "customers" ADD CONSTRAINT "customers_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "customers" ADD CONSTRAINT "customers_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_par_category_id_fkey" FOREIGN KEY ("par_category_id") REFERENCES "product_categories"("id") ON DELETE NO ACTION ON UPDATE NO ACTION;
@@ -393,7 +432,7 @@ ALTER TABLE "product_categories" ADD CONSTRAINT "product_categories_par_category
 ALTER TABLE "products" ADD CONSTRAINT "products_category_id_fkey" FOREIGN KEY ("category_id") REFERENCES "product_categories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "ingredients" ADD CONSTRAINT "ingredients_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "ingredients" ADD CONSTRAINT "ingredients_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "ingredient_products" ADD CONSTRAINT "ingredient_products_product_id_fkey" FOREIGN KEY ("product_id") REFERENCES "products"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -409,12 +448,6 @@ ALTER TABLE "inventory_items" ADD CONSTRAINT "inventory_items_ingredient_id_fkey
 
 -- AddForeignKey
 ALTER TABLE "inventory_items" ADD CONSTRAINT "inventory_items_inventory_id_fkey" FOREIGN KEY ("inventory_id") REFERENCES "inventories"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "inventory_traits" ADD CONSTRAINT "inventory_traits_inventory_item_id_fkey" FOREIGN KEY ("inventory_item_id") REFERENCES "inventory_items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
-
--- AddForeignKey
-ALTER TABLE "inventory_traits" ADD CONSTRAINT "inventory_traits_created_by_fkey" FOREIGN KEY ("created_by") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "merchandises" ADD CONSTRAINT "merchandises_shop_id_fkey" FOREIGN KEY ("shop_id") REFERENCES "shops"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -447,10 +480,22 @@ ALTER TABLE "order_items" ADD CONSTRAINT "order_items_order_id_fkey" FOREIGN KEY
 ALTER TABLE "payments" ADD CONSTRAINT "payments_order_id_fkey" FOREIGN KEY ("order_id") REFERENCES "orders"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
+ALTER TABLE "subscription_features" ADD CONSTRAINT "subscription_features_subscription_id_fkey" FOREIGN KEY ("subscription_id") REFERENCES "subscriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "subscription_features" ADD CONSTRAINT "subscription_features_feature_id_fkey" FOREIGN KEY ("feature_id") REFERENCES "features"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
 ALTER TABLE "tenant_subscriptions" ADD CONSTRAINT "tenant_subscriptions_subscription_id_fkey" FOREIGN KEY ("subscription_id") REFERENCES "subscriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "tenant_subscriptions" ADD CONSTRAINT "tenant_subscriptions_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "tenant_subscriptions" ADD CONSTRAINT "tenant_subscriptions_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "subscription_payments" ADD CONSTRAINT "subscription_payments_sub_tenant_id_fkey" FOREIGN KEY ("sub_tenant_id") REFERENCES "tenant_subscriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "pending_subscriptions" ADD CONSTRAINT "pending_subscriptions_subscription_id_fkey" FOREIGN KEY ("subscription_id") REFERENCES "subscriptions"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "pending_subscriptions" ADD CONSTRAINT "pending_subscriptions_tenant_id_fkey" FOREIGN KEY ("tenant_id") REFERENCES "tenants"("id") ON DELETE SET NULL ON UPDATE CASCADE;
