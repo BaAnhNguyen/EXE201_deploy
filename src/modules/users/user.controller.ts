@@ -1,6 +1,8 @@
 import {
 	Body,
 	Controller,
+	Get,
+	Param,
 	Post,
 	Req,
 	UseGuards,
@@ -23,5 +25,11 @@ export class UserController {
 	@UsePipes(new ValidationPipe({ transform: true }))
 	createCashier(@Body() dto: CreateCashierDto, @Req() req: any) {
 		return this.userService.createCashier(dto, req.user?.tenant_id, req.user?.shop_id);
+	}
+
+	@Get('shops/:shopId/staff')
+	@Roles('SHOPOWNER')
+	getStaffByShop(@Param('shopId') shopId: string, @Req() req: any) {
+		return this.userService.getStaffByShop(+shopId, req.user?.tenant_id);
 	}
 }
