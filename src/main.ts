@@ -1,3 +1,7 @@
+import * as dns from 'dns'; // 👈 THÊM DÒNG NÀY Ở TRÊN CÙNG
+
+dns.setDefaultResultOrder('ipv4first'); // 👈 THÊM NGAY SAU IMPORT
+
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';

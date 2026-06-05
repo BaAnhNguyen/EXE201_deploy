@@ -100,4 +100,58 @@ export class UserService {
 			},
 		};
 	}
+
+	async getStaffByShop(shopId: number, tenantId: number | null | undefined) {
+		if (!tenantId) {
+			throw new ForbiddenException('Không tìm thấy tenant của tài khoản đang đăng nhập');
+		}
+
+		if (!shopId || isNaN(shopId)) {
+			throw new BadRequestException('Shop ID không hợp lệ');
+		}
+
+		const shop = await this.prisma.shop.findFirst({
+			where: { id: shopId, tenant_id: tenantId },
+		});
+
+		if (!shop) {
+			throw new NotFoundException(`Shop #${shopId} không tồn tại hoặc bạn không có quyền truy cập`);
+		}
+
+		const staff = await this.prisma.user.findMany({
+			where: {
+				shop_id: shopId,
+				tenant_id: tenantId,
+				role: {
+					role_code: {
+						not: 'SHOPOWNER',
+					},
+				},
+			},
+			select: {
+				id: true,
+				username: true,
+				email: true,
+				full_name: true,
+				phone: true,
+				avatar: true,
+				is_active: true,
+				created_at: true,
+				role: {
+					select: {
+						role_code: true,
+						description: true,
+					},
+				},
+			},
+			orderBy: {
+				created_at: 'desc',
+			},
+		});
+
+		return {
+			message: 'Lấy danh sách nhân viên thành công',
+			data: staff,
+		};
+	}
 }
