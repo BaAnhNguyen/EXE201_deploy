@@ -57,4 +57,15 @@ export class OrderController {
   ) {
     return this.orderService.update(id, dto, shopId, req.user.tenant_id);
   }
+
+  // POST /shops/:shopId/orders/:id/checkout
+  @Post(':id/checkout')
+  @Roles('CASHIER', 'SHOPOWNER')
+  checkout(
+    @Param('shopId', ParseIntPipe) shopId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Req() req: any,
+  ) {
+    return this.orderService.checkout(id, shopId, req.user.tenant_id);
+  }
 }

@@ -134,4 +134,87 @@ export class OrderService {
 
     return this.orderRepository.update(id, data);
   }
+
+  // ── Checkout ─────────────────────────────────────────────────────
+
+  async checkout(id: number, shopId: number, tenantId: number) {
+    await this.resolveShopFromUser(tenantId, shopId);
+    
+    // 1. Fetch order and ensure it belongs to the shop and is not completed
+    const order = await this.prisma.orders.findFirst({
+      where: { id, shift: { shop_id: shopId } },
+      include: {
+        order_items: {
+          include: {
+            product: {
+              include: { ingredient_products: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) throw new NotFoundException(`Order #${id} not found`);
+    if (order.order_status === 'COMPLETED') {
+      throw new BadRequestException(`Order #${id} is already completed`);
+    } 
+
+    // 2. Calculate deductions
+    const ingredientDeductions = new Map<number, number>();
+    for (const item of order.order_items) {
+      const quantity = item.quantity;
+      const productIngredients = item.product.ingredient_products;
+
+      for (const pi of productIngredients) {
+        const currentQty = ingredientDeductions.get(pi.ingredient_id) || 0;
+        const requiredQty = Number(pi.quantity_required) * quantity;
+        ingredientDeductions.set(pi.ingredient_id, currentQty + requiredQty);
+      }
+    }
+
+    // 3. Perform transaction to update inventory and order status
+    return this.prisma.withTransaction(async (tx) => {
+      const inventory = await tx.inventory.findUnique({
+        where: { shop_id: shopId },
+      });
+
+      if (inventory) {
+        for (const [ingredientId, amountToDeduct] of ingredientDeductions.entries()) {
+          const inventoryItem = await tx.inventoryItem.findFirst({
+            where: {
+              inventory_id: inventory.id,
+              ingredient_id: ingredientId,
+            },
+          });
+
+          if (inventoryItem) {
+            await tx.inventoryItem.update({
+              where: { id: inventoryItem.id },
+              data: {
+                theorical_quantity: {
+                  decrement: Math.ceil(amountToDeduct),
+                },
+              },
+            });
+          }
+        }
+      }
+
+      // Mark order as COMPLETED
+      return tx.orders.update({
+        where: { id },
+        data: {
+          order_status: 'COMPLETED',
+          completed_at: new Date(),
+        },
+        include: {
+          shift: true,
+          cashier: { select: { id: true, full_name: true, email: true } },
+          customer: true,
+          order_items: { include: { product: true } },
+          payments: true,
+        },
+      });
+    });
+  }
 }
