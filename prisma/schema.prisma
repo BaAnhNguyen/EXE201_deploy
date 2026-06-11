@@ -57,6 +57,7 @@ model Tenant {
   tenant_subscriptions  TenantSubscription[]
   pending_subscriptions PendingSubscription[]
   shift_templates       ShiftTemplate[]
+  notifications         Notification[]
 
   @@map("tenants")
 }
@@ -309,6 +310,12 @@ model InventoryItem {
 // MERCHANDISE & REWARDS
 // ========================================
 
+enum NotificationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 model Merchandise {
   id               Int      @id @default(autoincrement())
   shop_id          Int
@@ -341,6 +348,22 @@ model MerchandiseRedemption {
   shop        Shop        @relation(fields: [shop_id], references: [id])
 
   @@map("merchandise_redemptions")
+}
+
+model Notification {
+  id             Int                  @id @default(autoincrement())
+  tenant_id      Int
+  title          String
+  content        String
+  severity_level NotificationSeverity @default(INFO)
+  is_read        Boolean              @default(false)
+  created_at     DateTime             @default(now())
+
+  tenant         Tenant               @relation(fields: [tenant_id], references: [id], onDelete: Cascade)
+
+  @@index([tenant_id, is_read])
+  @@index([tenant_id, created_at])
+  @@map("notifications")
 }
 
 // ========================================
