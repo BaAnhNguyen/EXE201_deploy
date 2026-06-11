@@ -30,6 +30,11 @@ export class RoleController {
 		return this.roleService.findAll();
 	}
 
+	@Get('permissions')
+	getPermissions() {
+		return this.roleService.getPermissions();
+	}
+
 	@Get(':id')
 	async findById(@Param('id', ParseIntPipe) id: number) {
 		return this.roleService.findById(id);

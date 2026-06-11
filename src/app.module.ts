@@ -22,6 +22,10 @@ import { ShiftModule } from './modules/shifts/shift.module';
 import { ProductCategoryModule } from './modules/product-categories/product-category.module';
 import { OrderModule } from './modules/orders/order.module';
 import { UserModule } from './modules/users/user.module';
+import { ReportModule } from './modules/reports/report.module';
+import { NotificationModule } from './modules/notifications/notification.module';
+import { ChatbotModule } from './modules/chatbot/chatbot.module';
+
 @Module({
   imports: [
     // Load .env
@@ -49,8 +53,11 @@ import { UserModule } from './modules/users/user.module';
     InventoryModule,
     ShiftTemplateModule,
     ShiftModule,
-    OrderModule
-    ,UserModule
+    OrderModule,
+    UserModule,
+    ReportModule,
+    NotificationModule,
+    ChatbotModule,
   ],
   controllers: [], // Để trống vì đã xóa AppController
   providers: [], // Để trống vì đã xóa AppService
