@@ -54,6 +54,7 @@ export class OrderService {
         category: { tenant_id: tenantId },
         is_active: true,
       },
+      include: { ingredient_products: true },
     });
 
     if (products.length !== productIds.length) {
@@ -61,6 +62,52 @@ export class OrderService {
     }
 
     const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // 1. Verify inventory
+    const ingredientDeductions = new Map<number, number>();
+    for (const item of dto.items) {
+      const product = productMap.get(item.product_id)!;
+      for (const pi of product.ingredient_products) {
+        const currentQty = ingredientDeductions.get(pi.ingredient_id) || 0;
+        const requiredQty = Number(pi.quantity_required) * item.quantity;
+        ingredientDeductions.set(pi.ingredient_id, currentQty + requiredQty);
+      }
+    }
+
+    const inventory = await this.prisma.inventory.findUnique({
+      where: { shop_id: shopId },
+      include: { inventory_items: { include: { ingredient: true } } },
+    });
+
+    if (inventory) {
+      const inventoryMap = new Map(inventory.inventory_items.map((i) => [i.ingredient_id, i]));
+      for (const [ingredientId, amountToDeduct] of ingredientDeductions.entries()) {
+        const inventoryItem = inventoryMap.get(ingredientId);
+        if (inventoryItem) {
+          const available = inventoryItem.theorical_quantity - (inventoryItem.minimum_threshold ?? 0);
+          if (available < amountToDeduct) {
+            const relatedItem = dto.items.find((item) => {
+              const p = productMap.get(item.product_id);
+              return p?.ingredient_products.some((ip) => ip.ingredient_id === ingredientId);
+            });
+            if (relatedItem) {
+              const p = productMap.get(relatedItem.product_id)!;
+              const ip = p.ingredient_products.find((ip) => ip.ingredient_id === ingredientId)!;
+              const reqPerProduct = Number(ip.quantity_required);
+              const maxCanSell = reqPerProduct > 0 ? Math.floor(available / reqPerProduct) : 0;
+              const safeMax = Math.max(0, maxCanSell);
+              throw new BadRequestException(
+                `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ. (Chỉ có thể bán thêm tối đa ${safeMax} "${p.product_name}")`,
+              );
+            } else {
+              throw new BadRequestException(
+                `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ (dưới ngưỡng tối thiểu).`,
+              );
+            }
+          }
+        }
+      }
+    }
 
     // Calculate totals
     let subtotal = 0;
@@ -185,9 +232,30 @@ export class OrderService {
               inventory_id: inventory.id,
               ingredient_id: ingredientId,
             },
+            include: { ingredient: true },
           });
 
           if (inventoryItem) {
+            const available = inventoryItem.theorical_quantity - (inventoryItem.minimum_threshold ?? 0);
+            if (available < amountToDeduct) {
+              const relatedItem = order.order_items.find((item) =>
+                item.product.ingredient_products.some((ip) => ip.ingredient_id === ingredientId),
+              );
+              if (relatedItem) {
+                const ip = relatedItem.product.ingredient_products.find((ip) => ip.ingredient_id === ingredientId)!;
+                const reqPerProduct = Number(ip.quantity_required);
+                const maxCanSell = reqPerProduct > 0 ? Math.floor(available / reqPerProduct) : 0;
+                const safeMax = Math.max(0, maxCanSell);
+                throw new BadRequestException(
+                  `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ. (Chỉ có thể bán thêm tối đa ${safeMax} "${relatedItem.product.product_name}")`,
+                );
+              } else {
+                throw new BadRequestException(
+                  `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ (dưới ngưỡng tối thiểu).`,
+                );
+              }
+            }
+
             await tx.inventoryItem.update({
               where: { id: inventoryItem.id },
               data: {

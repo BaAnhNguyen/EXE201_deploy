@@ -99,6 +99,7 @@ export class InventoryService {
       theorical_quantity: dto.theorical_quantity,
       adjusted_quantity: dto.adjusted_quantity,
       actual_quantity: dto.actual_quantity,
+      minimum_threshold: dto.minimum_threshold,
     });
   }
 

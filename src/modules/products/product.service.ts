@@ -32,12 +32,12 @@ export class ProductService {
     });
   }
 
-  async findAll(tenantId: number) {
-    return this.productRepository.findAll(tenantId);
+  async findAll(tenantId: number, shopId?: number) {
+    return this.productRepository.findAll(tenantId, shopId);
   }
 
-  async findOne(id: number, tenantId: number) {
-    const product = await this.productRepository.findByTenantAndId(id, tenantId);
+  async findOne(id: number, tenantId: number, shopId?: number) {
+    const product = await this.productRepository.findByTenantAndId(id, tenantId, shopId);
     if (!product) {
       throw new NotFoundException(`Product #${id} not found`);
     }

@@ -24,4 +24,10 @@ export class UpdateQuantitiesDto {
   @Min(0)
   @Type(() => Number)
   actual_quantity?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Type(() => Number)
+  minimum_threshold?: number;
 }
