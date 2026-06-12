@@ -42,6 +42,11 @@ export class ReportService {
     let totalCOGS = 0;
     const productSalesMap = new Map<number, { name: string; quantity: number; revenue: number }>();
 
+    const allProducts = await this.reportRepository.getAllActiveProducts(tenantId);
+    for (const p of allProducts) {
+      productSalesMap.set(p.id, { name: p.product_name, quantity: 0, revenue: 0 });
+    }
+
     for (const order of completedOrders) {
       for (const item of order.order_items) {
         const qty = item.quantity;

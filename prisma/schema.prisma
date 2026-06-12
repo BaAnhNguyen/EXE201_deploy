@@ -298,6 +298,7 @@ model InventoryItem {
   theorical_quantity Int      @default(0) // Expected based on transactions
   adjusted_quantity  Int?     @default(0) // Manually adjusted
   actual_quantity    Int?     @default(0) // Physically counted
+  minimum_threshold  Int      @default(0) // Threshold to prevent sales
   updated_at         DateTime @updatedAt
 
   ingredient Ingredient @relation(fields: [ingredient_id], references: [id])

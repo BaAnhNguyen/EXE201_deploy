@@ -39,4 +39,17 @@ export class ReportRepository {
       },
     });
   }
+
+  async getAllActiveProducts(tenantId: number) {
+    return this.prisma.product.findMany({
+      where: {
+        category: { tenant_id: tenantId },
+        is_active: true,
+      },
+      select: {
+        id: true,
+        product_name: true,
+      },
+    });
+  }
 }

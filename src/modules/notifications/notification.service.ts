@@ -80,23 +80,24 @@ export class NotificationService {
         where: { shop_id: shop.id },
       });
 
-      if (!inventory || inventory.minimum_threshold === null) {
+      if (!inventory) {
         continue;
       }
 
-      const lowStockItems = await this.prisma.inventoryItem.findMany({
-        where: {
-          inventory_id: inventory.id,
-          theorical_quantity: { lte: inventory.minimum_threshold },
-        },
+      const allItems = await this.prisma.inventoryItem.findMany({
+        where: { inventory_id: inventory.id },
         include: { ingredient: true },
       });
+
+      const lowStockItems = allItems.filter(
+        (item) => item.minimum_threshold !== null && item.theorical_quantity <= item.minimum_threshold
+      );
 
       for (const item of lowStockItems) {
         if (!item.ingredient.is_active) continue;
 
         const title = `Nguyên liệu cạn kho: ${item.ingredient.name} tại ${shop.shop_name}`;
-        const content = `Nguyên liệu "${item.ingredient.name}" sắp hết (Hiện tại: ${item.theorical_quantity ?? 0} ${item.ingredient.unit || ''}, Ngưỡng tối thiểu: ${inventory.minimum_threshold}).`;
+        const content = `Nguyên liệu "${item.ingredient.name}" sắp hết (Hiện tại: ${item.theorical_quantity ?? 0} ${item.ingredient.unit || ''}, Ngưỡng tối thiểu: ${item.minimum_threshold}).`;
 
         const existing = await this.notificationRepository.findExistingUnread(tenantId, title);
         if (!existing) {
