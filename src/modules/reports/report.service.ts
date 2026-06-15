@@ -175,9 +175,11 @@ export class ReportService {
 
     if (startDateStr) {
       startDate = new Date(startDateStr);
+      startDate.setHours(0, 0, 0, 0);
     }
     if (endDateStr) {
       endDate = new Date(endDateStr);
+      endDate.setHours(23, 59, 59, 999);
     }
 
     if (!startDate && !endDate && range) {
