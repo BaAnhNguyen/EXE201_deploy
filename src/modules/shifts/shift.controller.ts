@@ -20,23 +20,25 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
-@Roles('SHOPOWNER')
 @Controller('shifts')
 export class ShiftController {
   constructor(private readonly service: ShiftService) {}
 
   @Post()
+  @Roles('SHOPOWNER')
   @UsePipes(new ValidationPipe({ transform: true }))
   create(@Body() dto: CreateShiftDto, @Req() req: any) {
     return this.service.create(dto, req.user?.tenant_id);
   }
 
   @Get('shop/:shopId')
+  @Roles('CASHIER', 'SHOPOWNER', 'INVENTORY_STAFF')
   findAllByShop(@Param('shopId', ParseIntPipe) shopId: number, @Req() req: any) {
     return this.service.findAllByShop(shopId, req.user?.tenant_id);
   }
 
   @Patch(':id')
+  @Roles('SHOPOWNER')
   update(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateShiftDto,
@@ -46,6 +48,7 @@ export class ShiftController {
   }
 
   @Delete(':id')
+  @Roles('SHOPOWNER')
   remove(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
     return this.service.remove(id, req.user?.tenant_id);
   }
