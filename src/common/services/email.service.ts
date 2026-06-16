@@ -47,9 +47,10 @@ export class EmailService {
 		}
 	}
 
-	async sendResetPasswordEmail(email: string, resetToken: string, appUrl: string = 'http://localhost:5000'): Promise<void> {
+	async sendResetPasswordEmail(email: string, resetToken: string, appUrl?: string): Promise<void> {
+		const baseUrl = appUrl || this.configService.get<string>('APP_URL') || process.env.APP_URL || 'http://localhost:5000';
 		const resetPath = this.configService.get<string>('RESET_PASSWORD_PATH') || process.env.RESET_PASSWORD_PATH || '/reset-password';
-		const resetLink = `${appUrl}${resetPath}?token=${resetToken}`;
+		const resetLink = `${baseUrl}${resetPath}?token=${resetToken}`;
 
 		const from = this.configService.get<string>('EMAIL_FROM') || process.env.EMAIL_FROM || this.configService.get<string>('EMAIL_USER') || process.env.EMAIL_USER || 'noreply@salesmanagement.com';
 		const mailOptions = {
@@ -77,10 +78,11 @@ export class EmailService {
 		email: string,
 		username: string,
 		password: string,
-		appUrl: string = 'http://localhost:5000',
+		appUrl?: string,
 	): Promise<void> {
+		const baseUrl = appUrl || this.configService.get<string>('APP_URL') || process.env.APP_URL || 'http://localhost:5000';
 		const from = this.configService.get<string>('EMAIL_FROM') || process.env.EMAIL_FROM || this.configService.get<string>('EMAIL_USER') || process.env.EMAIL_USER || 'noreply@salesmanagement.com';
-		const loginLink = `${appUrl}/login`;
+		const loginLink = `${baseUrl}/login`;
 
 		const mailOptions = {
 			from,
