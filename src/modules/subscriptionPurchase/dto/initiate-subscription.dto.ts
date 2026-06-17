@@ -1,4 +1,4 @@
-import { IsEmail, IsNotEmpty, IsNumber, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsNotEmpty, IsNumber, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class InitiateSubscriptionDto {
   @IsNumber()
@@ -22,4 +22,8 @@ export class InitiateSubscriptionDto {
   @IsString()
   @IsNotEmpty()
   tenant_name: string;
+
+  @IsString()
+  @IsOptional()
+  payment_method?: 'PAYOS' | 'CASH';
 }

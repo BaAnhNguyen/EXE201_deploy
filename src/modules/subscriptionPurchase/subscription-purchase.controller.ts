@@ -24,6 +24,7 @@ export class SubscriptionPurchaseController {
       req.user.sub,
       req.user.tenant_id,
       dto.subscription_id,
+      dto.payment_method,
     );
   }
 
@@ -41,6 +42,16 @@ export class SubscriptionPurchaseController {
   @Post('confirm')
   confirmPayment(@Body() dto: ConfirmPaymentDto) {
     return this.purchaseService.confirmPaymentFromReturn(dto.orderCode);
+  }
+
+  @Get('pending-cash')
+  getPendingCashRequests() {
+    return this.purchaseService.getPendingCashRequests();
+  }
+
+  @Post('confirm-cash/:orderCode')
+  confirmCashPayment(@Param('orderCode') orderCode: string) {
+    return this.purchaseService.confirmCashPayment(orderCode);
   }
   // Thêm vào controller
     @Post('confirm-webhook')
