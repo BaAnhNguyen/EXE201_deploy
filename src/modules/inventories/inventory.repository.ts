@@ -77,6 +77,7 @@ export class InventoryRepository {
       theorical_quantity?: number;
       adjusted_quantity?: number;
       actual_quantity?: number;
+      minimum_threshold?: number;
     },
   ) {
     return this.prisma.inventoryItem.update({
@@ -91,15 +92,12 @@ export class InventoryRepository {
   async findLowStockItems(shopId: number) {
     const inventory = await this.prisma.inventory.findUnique({
       where: { shop_id: shopId },
+      include: { inventory_items: { include: { ingredient: true } } },
     });
-    if (!inventory || inventory.minimum_threshold === null) return [];
+    if (!inventory) return [];
 
-    return this.prisma.inventoryItem.findMany({
-      where: {
-        inventory_id: inventory.id,
-        actual_quantity: { lte: inventory.minimum_threshold },
-      },
-      include: { ingredient: true },
-    });
+    return inventory.inventory_items.filter(
+      (item) => item.actual_quantity !== null && item.actual_quantity <= item.minimum_threshold
+    );
   }
 }

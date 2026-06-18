@@ -23,13 +23,13 @@ export class ProductController {
   @Get()
   @Roles('SHOPOWNER', 'CASHIER')
   findAll(@Req() req: any) {
-    return this.productService.findAll(req.user.tenant_id);
+    return this.productService.findAll(req.user.tenant_id, req.user.shop_id);
   }
 
   @Get(':id')
   @Roles('SHOPOWNER', 'CASHIER')
   findOne(@Param('id', ParseIntPipe) id: number, @Req() req: any) {
-    return this.productService.findOne(id, req.user.tenant_id);
+    return this.productService.findOne(id, req.user.tenant_id, req.user.shop_id);
   }
 
   @Patch(':id')

@@ -7,14 +7,14 @@ import { UpdateCustomerDto } from './dto/update-customer.dto';
 export class CustomerService {
   constructor(private readonly customerRepository: CustomerRepository) {}
 
-  async create(createCustomerDto: CreateCustomerDto, defaultTenantId: number = 1) {
-    const tenant_id = createCustomerDto.tenant_id || defaultTenantId;
+  async create(createCustomerDto: CreateCustomerDto, tenantId: number) {
+    const tenant_id = createCustomerDto.tenant_id || tenantId;
     try {
       return await this.customerRepository.create({
         ...createCustomerDto,
         tenant_id,
       });
-    } catch (error) {
+    } catch (error: any) {
       if (error.code === 'P2003' && error.meta?.constraint === 'customers_tenant_id_fkey') {
         throw new BadRequestException(`Tenant with ID ${tenant_id} does not exist. Please create a tenant first.`);
       }
@@ -22,28 +22,30 @@ export class CustomerService {
     }
   }
 
-  async findAll() {
-    return this.customerRepository.findAll({});
+  async findAll(tenantId: number) {
+    return this.customerRepository.findAll({
+      where: { tenant_id: tenantId },
+    });
   }
 
-  async findOne(id: number) {
+  async findOne(id: number, tenantId: number) {
     const customer = await this.customerRepository.findOne({ id });
-    if (!customer) {
+    if (!customer || customer.tenant_id !== tenantId) {
       throw new NotFoundException(`Customer with ID ${id} not found`);
     }
     return customer;
   }
 
-  async update(id: number, updateCustomerDto: UpdateCustomerDto) {
-    await this.findOne(id);
+  async update(id: number, updateCustomerDto: UpdateCustomerDto, tenantId: number) {
+    await this.findOne(id, tenantId);
     return this.customerRepository.update({
       where: { id },
       data: updateCustomerDto,
     });
   }
 
-  async remove(id: number) {
-    await this.findOne(id);
+  async remove(id: number, tenantId: number) {
+    await this.findOne(id, tenantId);
     return this.customerRepository.delete({ id });
   }
 }
