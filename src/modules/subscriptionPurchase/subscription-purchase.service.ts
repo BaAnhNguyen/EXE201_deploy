@@ -45,23 +45,26 @@ export class SubscriptionPurchaseService {
       throw new ConflictException('Username or email already exists');
     }
 
-    const existingPending = await this.prisma.pendingSubscription.findFirst({
+    const existingPendingList = await this.prisma.pendingSubscription.findMany({
       where: {
         OR: [{ username: dto.username }, { email: dto.email }],
         status: 'PENDING',
-        expires_at: { gt: new Date() },
       },
     });
 
-    if (existingPending) {
-      throw new ConflictException(
-        'A pending payment already exists for this account. Please complete or wait for it to expire.',
-      );
+    if (existingPendingList.length > 0) {
+      await this.prisma.pendingSubscription.updateMany({
+        where: {
+          id: { in: existingPendingList.map((p) => p.id) },
+        },
+        data: { status: 'CANCELLED' },
+      });
     }
 
+    const paymentMethod = dto.payment_method === 'CASH' ? 'CASH' : 'PAYOS';
     const hashed_password = await bcrypt.hash(dto.password, 10);
     const payos_order_code = Date.now();
-    const expires_at = new Date(Date.now() + PENDING_RECORD_TTL_MS);
+    const expires_at = paymentMethod === 'CASH' ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : new Date(Date.now() + PENDING_RECORD_TTL_MS);
     const payos = this.createPayOSClient();
     const APP_URL = this.getAppUrl();
 
@@ -91,13 +94,22 @@ export class SubscriptionPurchaseService {
             password: hashed_password,
             tenant_name: dto.tenant_name,
             payos_order_code: payos_order_code.toString(),
+            payment_method: paymentMethod,
             expires_at,
             status: 'PENDING',
           },
         });
 
+        if (paymentMethod === 'CASH') {
+          return { orderCode: payos_order_code.toString(), isCash: true, status: 'PENDING' };
+        }
+
         const checkoutResponse = await payos.paymentRequests.create(paymentData);
-        return { checkoutUrl: checkoutResponse.checkoutUrl, orderCode: payos_order_code.toString() };
+        return {
+          ...checkoutResponse,
+          checkoutUrl: checkoutResponse.checkoutUrl,
+          orderCode: payos_order_code.toString(),
+        };
       });
     } catch (error: any) {
       console.error('PayOS error:', error);
@@ -109,7 +121,9 @@ export class SubscriptionPurchaseService {
     userId: number,
     tenantId: number | null | undefined,
     subscriptionId: number,
+    paymentMethodInput?: string,
   ) {
+    const paymentMethod = paymentMethodInput === 'CASH' ? 'CASH' : 'PAYOS';
     if (!tenantId) {
       throw new BadRequestException('Tài khoản chưa gắn tenant, không thể gia hạn');
     }
@@ -136,24 +150,24 @@ export class SubscriptionPurchaseService {
       throw new NotFoundException('Subscription package not found or inactive');
     }
 
-    const existingPending = await this.prisma.pendingSubscription.findFirst({
+    const existingPendingList = await this.prisma.pendingSubscription.findMany({
       where: {
         tenant_id: tenantId,
         purchase_type: PURCHASE_TYPE_RENEW,
         status: 'PENDING',
-        expires_at: { gt: new Date() },
       },
     });
 
-    if (existingPending) {
-      throw new ConflictException(
-        'Đã có giao dịch gia hạn đang chờ thanh toán. Vui lòng hoàn tất hoặc đợi hết hạn.',
-      );
+    if (existingPendingList.length > 0) {
+      await this.prisma.pendingSubscription.updateMany({
+        where: { id: { in: existingPendingList.map(p => p.id) } },
+        data: { status: 'CANCELLED' },
+      });
     }
 
     const hashed_password = await bcrypt.hash(`RENEW:${tenantId}:${Date.now()}`, 10);
     const payos_order_code = Date.now();
-    const expires_at = new Date(Date.now() + PENDING_RECORD_TTL_MS);
+    const expires_at = paymentMethod === 'CASH' ? new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) : new Date(Date.now() + PENDING_RECORD_TTL_MS);
     const payos = this.createPayOSClient();
     const APP_URL = this.getAppUrl();
 
@@ -184,13 +198,22 @@ export class SubscriptionPurchaseService {
             password: hashed_password,
             tenant_name: tenant.tenant_name,
             payos_order_code: payos_order_code.toString(),
+            payment_method: paymentMethod,
             expires_at,
             status: 'PENDING',
           },
         });
 
+        if (paymentMethod === 'CASH') {
+          return { orderCode: payos_order_code.toString(), isCash: true, status: 'PENDING' };
+        }
+
         const checkoutResponse = await payos.paymentRequests.create(paymentData);
-        return { checkoutUrl: checkoutResponse.checkoutUrl, orderCode: payos_order_code.toString() };
+        return {
+          ...checkoutResponse,
+          checkoutUrl: checkoutResponse.checkoutUrl,
+          orderCode: payos_order_code.toString(),
+        };
       });
     } catch (error: any) {
       console.error('PayOS renew error:', error);
@@ -266,6 +289,47 @@ export class SubscriptionPurchaseService {
     }
 
     return this.fulfillPendingPayment(orderCode);
+  }
+
+  /**
+   * Lấy danh sách yêu cầu thanh toán tiền mặt (cho Admin)
+   */
+  async getPendingCashRequests() {
+    return this.prisma.pendingSubscription.findMany({
+      where: {
+        payment_method: 'CASH',
+        status: 'PENDING',
+      },
+      include: {
+        subscription: true,
+        tenant: true,
+      },
+      orderBy: { created_at: 'desc' },
+    });
+  }
+
+  /**
+   * API dành cho Admin duyệt các đơn hàng Tiền mặt (CASH)
+   */
+  async confirmCashPayment(orderCode: string) {
+    const pending = await this.prisma.pendingSubscription.findUnique({
+      where: { payos_order_code: orderCode },
+    });
+
+    if (!pending) {
+      throw new NotFoundException('Không tìm thấy giao dịch này');
+    }
+
+    if (pending.status !== 'PENDING') {
+      throw new BadRequestException(`Giao dịch này đang ở trạng thái ${pending.status}`);
+    }
+
+    if (pending.payment_method !== 'CASH') {
+      throw new BadRequestException('Chỉ có thể duyệt tay cho đơn hàng thanh toán bằng tiền mặt');
+    }
+
+    const result = await this.fulfillPendingPayment(orderCode);
+    return { ...result, message: 'Đã duyệt thanh toán tiền mặt thành công' };
   }
 
   private async fulfillPendingPayment(orderCode: string) {
