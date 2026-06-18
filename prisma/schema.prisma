@@ -508,7 +508,6 @@ model PendingSubscription {
   tenant_name      String
   payos_order_code String   @unique // mã đơn hàng PayOS
   status           String   @default("PENDING") // PENDING | PAID | CANCELLED | EXPIRED
-  payment_method   String   @default("PAYOS") // PAYOS | CASH
   expires_at       DateTime // created_at + 2 phút
   created_at       DateTime @default(now())
 
@@ -517,3 +516,6 @@ model PendingSubscription {
 
   @@map("pending_subscriptions")
 }
+
+
+
