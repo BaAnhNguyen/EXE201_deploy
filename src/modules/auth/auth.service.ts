@@ -1,0 +1,239 @@
+import {
+	BadRequestException,
+	ConflictException,
+	Injectable,
+	UnauthorizedException,
+} from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
+import { User } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
+import { StringValue } from 'ms';
+import { PrismaService } from 'src/database/prisma.service';
+import { EmailService } from 'src/common/services/email.service';
+import { AuthRepository } from './auth.repository';
+import { LoginDto } from './dto/login.dto';
+import { RegisterDto } from './dto/register.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
+
+type AuthPayload = {
+	sub: number;
+	username: string;
+	email: string;
+	role_id: number | null;
+	tenant_id: number | null;
+	shop_id: number | null;
+};
+
+type ResetPasswordPayload = {
+	sub: number;
+	email: string;
+	type: 'reset-password';
+	accountType: 'user' | 'admin';
+};
+
+@Injectable()
+export class AuthService {
+	private readonly RESET_PASSWORD_EXPIRES_IN = '15m';
+
+	constructor(
+		private readonly authRepository: AuthRepository,
+		private readonly prismaService: PrismaService,
+		private readonly jwtService: JwtService,
+		private readonly configService: ConfigService,
+		private readonly emailService: EmailService,
+	) {}
+
+	async register(registerDto: RegisterDto) {
+		const existedUser = await this.authRepository.findUserByEmailOrUsername(
+			registerDto.email,
+			registerDto.username,
+		);
+
+		if (existedUser) {
+			throw new ConflictException('Email or username already exists');
+		}
+
+		const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+
+		return this.prismaService.withTransaction(async (transactionClient) => {
+			const createdUser = await this.authRepository.createUser(
+				{
+					username: registerDto.username,
+					email: registerDto.email,
+					password: hashedPassword,
+					full_name: registerDto.full_name,
+					phone: registerDto.phone,
+					tenant_id: registerDto.tenant_id ?? null,
+					shop_id: registerDto.shop_id ?? null,
+					role_id: registerDto.role_id ?? null,
+				},
+				transactionClient,
+			);
+
+			const token = await this.signToken(createdUser);
+
+			return {
+				user: this.mapUserResponse(createdUser),
+			};
+		});
+	}
+
+	async login(loginDto: LoginDto) {
+		if (!loginDto.username && !loginDto.email) {
+			throw new BadRequestException('Username or email is required');
+		}
+
+		const user = await this.authRepository.findUserByEmailOrUsername(
+			loginDto.email ?? '',
+			loginDto.username ?? '',
+		);
+
+		if (!user) {
+			throw new UnauthorizedException('Invalid username/email or password');
+		}
+
+		const isPasswordMatched = await bcrypt.compare(loginDto.password, user.password);
+
+		if (!isPasswordMatched) {
+			throw new UnauthorizedException('Invalid username/email or password');
+		}
+
+		await this.authRepository.updateLastLogin(user.id);
+
+		const token = await this.signToken(user);
+
+		return {
+			accessToken: token,
+			user: this.mapUserResponse(user),
+		};
+	}
+
+	async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {
+		let account = await this.authRepository.findUserByEmail(forgotPasswordDto.email);
+		let accountType: 'user' | 'admin' = 'user';
+
+		if (!account) {
+			// Check if the email belongs to an Admin instead
+			const admin = await this.prismaService.admin.findUnique({
+				where: { email: forgotPasswordDto.email }
+			});
+			if (admin) {
+				account = admin as any; // Cast safely for this scope
+				accountType = 'admin';
+			}
+		}
+
+		if (!account) {
+			// Don't reveal if user exists or not for security
+			return {
+				message: 'If an account exists with that email, a password reset link will be sent',
+			};
+		}
+
+		try {
+			const resetToken = this.generateResetPasswordToken(account as any, accountType);
+			const appUrl = this.configService.get<string>('APP_URL') || 'http://localhost:3000';
+			
+			await this.emailService.sendResetPasswordEmail(
+				account.email,
+				resetToken,
+				appUrl,
+			);
+
+			return {
+				message: 'If an account exists with that email, a password reset link will be sent',
+			};
+		} catch (error) {
+			console.error('Error in forgotPassword:', error);
+			throw new BadRequestException('Failed to send reset password email');
+		}
+	}
+
+	async resetPassword(resetPasswordDto: ResetPasswordDto) {
+		try {
+			const payload = await this.jwtService.verifyAsync<ResetPasswordPayload>(
+				resetPasswordDto.token,
+				{
+					secret: this.configService.get<string>('jwt.secret') || this.configService.get<string>('JWT_SECRET'),
+				},
+			);
+
+			if (payload.type !== 'reset-password') {
+				throw new UnauthorizedException('Invalid token type');
+			}
+
+			const hashedPassword = await bcrypt.hash(resetPasswordDto.newPassword, 10);
+
+			if (payload.accountType === 'admin') {
+				const admin = await this.prismaService.admin.findUnique({ where: { id: payload.sub }});
+				if (!admin) throw new UnauthorizedException('Admin not found');
+				
+				await this.prismaService.admin.update({
+					where: { id: payload.sub },
+					data: { password: hashedPassword }
+				});
+			} else {
+				const user = await this.authRepository.findUserById(payload.sub);
+				if (!user) throw new UnauthorizedException('User not found');
+				
+				await this.authRepository.updatePassword(user.id, hashedPassword);
+			}
+
+			return {
+				message: 'Password reset successfully',
+			};
+		} catch (error) {
+			if (error instanceof UnauthorizedException) {
+				throw error;
+			}
+			throw new UnauthorizedException('Invalid or expired reset token');
+		}
+	}
+
+	private generateResetPasswordToken(account: User | any, accountType: 'user' | 'admin' = 'user'): string {
+		const payload: ResetPasswordPayload = {
+			sub: account.id,
+			email: account.email,
+			type: 'reset-password',
+			accountType,
+		};
+
+		return this.jwtService.sign(payload, {
+			expiresIn: this.RESET_PASSWORD_EXPIRES_IN,
+		});
+	}
+
+	private async signToken(user: User): Promise<string> {
+		const payload: AuthPayload = {
+			sub: user.id,
+			username: user.username,
+			email: user.email,
+			role_id: user.role_id,
+			tenant_id: user.tenant_id,
+			shop_id: user.shop_id,
+		};
+
+		return this.jwtService.signAsync(payload);
+	}
+
+	private mapUserResponse(user: any) {
+		return {
+			id: user.id,
+			username: user.username,
+			email: user.email,
+			full_name: user.full_name,
+			phone: user.phone,
+			avatar: user.avatar,
+			role_id: user.role_id,
+			role_code: user?.role?.role_code,
+			tenant_id: user.tenant_id,
+			shop_id: user.shop_id,
+			is_active: user.is_active,
+			created_at: user.created_at,
+			updated_at: user.updated_at,
+			last_login: user.last_login,
+		};
+	}
+}

@@ -1,0 +1,14 @@
+import { Module } from '@nestjs/common';
+import { CommonModule } from 'src/common/common.module';
+import { DatabaseModule } from 'src/database/database.module';
+import { UserController } from './user.controller';
+import { UserService } from './user.service';
+import { AuthModule } from '../auth/auth.module';
+
+@Module({
+	imports: [DatabaseModule, CommonModule, AuthModule],
+	controllers: [UserController],
+	providers: [UserService],
+	exports: [UserService],
+})
+export class UserModule {}

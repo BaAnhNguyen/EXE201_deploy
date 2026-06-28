@@ -1,0 +1,288 @@
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
+import { PrismaService } from '../../database/prisma.service';
+import { OrderRepository } from './order.repository';
+import { CreateOrderDto } from './dto/create-order.dto';
+import { UpdateOrderDto } from './dto/update-order.dto';
+
+@Injectable()
+export class OrderService {
+  constructor(
+    private readonly orderRepository: OrderRepository,
+    private readonly prisma: PrismaService,
+  ) {}
+
+  // ── Helpers ──────────────────────────────────────────────────────
+
+  private async resolveShift(shiftId: number, shopId: number) {
+    const shift = await this.prisma.shift.findFirst({
+      where: { id: shiftId, shop_id: shopId },
+    });
+    if (!shift) throw new NotFoundException(`Shift #${shiftId} not found in this shop`);
+    if (shift.shift_status === 'CLOSED') {
+      throw new BadRequestException('Cannot create order in a closed shift');
+    }
+    return shift;
+  }
+
+  private async resolveShopFromUser(tenantId: number, shopId: number) {
+    const shop = await this.prisma.shop.findFirst({
+      where: { id: shopId, tenant_id: tenantId },
+    });
+    if (!shop) throw new NotFoundException(`Shop #${shopId} not found`);
+    return shop;
+  }
+
+  // ── Create order with items ──────────────────────────────────────
+
+  async create(dto: CreateOrderDto, cashierId: number, shopId: number, tenantId: number) {
+    await this.resolveShopFromUser(tenantId, shopId);
+    await this.resolveShift(dto.shift_id, shopId);
+
+    if (!dto.items || dto.items.length === 0) {
+      throw new BadRequestException('Order must have at least one item');
+    }
+
+    // Fetch all products and validate they belong to tenant
+    const productIds = dto.items.map((i) => i.product_id);
+    const products = await this.prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        category: { tenant_id: tenantId },
+        is_active: true,
+      },
+      include: { ingredient_products: true },
+    });
+
+    if (products.length !== productIds.length) {
+      throw new BadRequestException('One or more products not found or inactive');
+    }
+
+    const productMap = new Map(products.map((p) => [p.id, p]));
+
+    // 1. Verify inventory
+    const ingredientDeductions = new Map<number, number>();
+    for (const item of dto.items) {
+      const product = productMap.get(item.product_id)!;
+      for (const pi of product.ingredient_products) {
+        const currentQty = ingredientDeductions.get(pi.ingredient_id) || 0;
+        const requiredQty = Number(pi.quantity_required) * item.quantity;
+        ingredientDeductions.set(pi.ingredient_id, currentQty + requiredQty);
+      }
+    }
+
+    const inventory = await this.prisma.inventory.findUnique({
+      where: { shop_id: shopId },
+      include: { inventory_items: { include: { ingredient: true } } },
+    });
+
+    if (inventory) {
+      const inventoryMap = new Map(inventory.inventory_items.map((i) => [i.ingredient_id, i]));
+      for (const [ingredientId, amountToDeduct] of ingredientDeductions.entries()) {
+        const inventoryItem = inventoryMap.get(ingredientId);
+        if (inventoryItem) {
+          const available = inventoryItem.theorical_quantity - (inventoryItem.minimum_threshold ?? 0);
+          if (available < amountToDeduct) {
+            const relatedItem = dto.items.find((item) => {
+              const p = productMap.get(item.product_id);
+              return p?.ingredient_products.some((ip) => ip.ingredient_id === ingredientId);
+            });
+            if (relatedItem) {
+              const p = productMap.get(relatedItem.product_id)!;
+              const ip = p.ingredient_products.find((ip) => ip.ingredient_id === ingredientId)!;
+              const reqPerProduct = Number(ip.quantity_required);
+              const maxCanSell = reqPerProduct > 0 ? Math.floor(available / reqPerProduct) : 0;
+              const safeMax = Math.max(0, maxCanSell);
+              throw new BadRequestException(
+                `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ. (Chỉ có thể bán thêm tối đa ${safeMax} "${p.product_name}")`,
+              );
+            } else {
+              throw new BadRequestException(
+                `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ (dưới ngưỡng tối thiểu).`,
+              );
+            }
+          }
+        }
+      }
+    }
+
+    // Calculate totals
+    let subtotal = 0;
+    const itemsData = dto.items.map((item) => {
+      const product = productMap.get(item.product_id)!;
+      const unitPrice = Number(product.unit_price);
+      subtotal += unitPrice * item.quantity;
+      return {
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: unitPrice,
+      };
+    });
+
+    // Get tax percentage from tenant
+    const tenant = await this.prisma.tenant.findUnique({ where: { id: tenantId } });
+    const taxPct = Number(tenant?.tax_percentage ?? 0);
+    const grandTotal = subtotal + (subtotal * taxPct) / 100;
+
+    // Create order + items in transaction
+    return this.prisma.withTransaction(async (tx) => {
+      const order = await tx.orders.create({
+        data: {
+          shift_id: dto.shift_id,
+          cashier_id: cashierId,
+          customer_id: dto.customer_id,
+          subtotal_amount: subtotal,
+          grand_total: grandTotal,
+          order_status: 'PENDING',
+          notes: dto.notes,
+          order_items: {
+            create: itemsData,
+          },
+        },
+        include: {
+          shift: true,
+          cashier: { select: { id: true, full_name: true, email: true } },
+          customer: true,
+          order_items: { include: { product: true } },
+          payments: true,
+        },
+      });
+      return order;
+    });
+  }
+
+  // ── Read ─────────────────────────────────────────────────────────
+
+  async findAll(shopId: number, tenantId: number) {
+    await this.resolveShopFromUser(tenantId, shopId);
+    return this.orderRepository.findAll(shopId);
+  }
+
+  async findOne(id: number, shopId: number, tenantId: number) {
+    await this.resolveShopFromUser(tenantId, shopId);
+    const order = await this.orderRepository.findByShopAndId(id, shopId);
+    if (!order) throw new NotFoundException(`Order #${id} not found`);
+    return order;
+  }
+
+  // ── Update status ────────────────────────────────────────────────
+
+  async update(id: number, dto: UpdateOrderDto, shopId: number, tenantId: number) {
+    await this.findOne(id, shopId, tenantId);
+
+    const data: any = {};
+    if (dto.order_status) data.order_status = dto.order_status;
+    if (dto.notes !== undefined) data.notes = dto.notes;
+    if (dto.order_status === 'COMPLETED') data.completed_at = new Date();
+    if (dto.order_status === 'CANCELLED') data.cancelled_at = new Date();
+
+    return this.orderRepository.update(id, data);
+  }
+
+  // ── Checkout ─────────────────────────────────────────────────────
+
+  async checkout(id: number, shopId: number, tenantId: number) {
+    await this.resolveShopFromUser(tenantId, shopId);
+    
+    // 1. Fetch order and ensure it belongs to the shop and is not completed
+    const order = await this.prisma.orders.findFirst({
+      where: { id, shift: { shop_id: shopId } },
+      include: {
+        order_items: {
+          include: {
+            product: {
+              include: { ingredient_products: true },
+            },
+          },
+        },
+      },
+    });
+
+    if (!order) throw new NotFoundException(`Order #${id} not found`);
+    if (order.order_status === 'COMPLETED') {
+      throw new BadRequestException(`Order #${id} is already completed`);
+    } 
+
+    // 2. Calculate deductions
+    const ingredientDeductions = new Map<number, number>();
+    for (const item of order.order_items) {
+      const quantity = item.quantity;
+      const productIngredients = item.product.ingredient_products;
+
+      for (const pi of productIngredients) {
+        const currentQty = ingredientDeductions.get(pi.ingredient_id) || 0;
+        const requiredQty = Number(pi.quantity_required) * quantity;
+        ingredientDeductions.set(pi.ingredient_id, currentQty + requiredQty);
+      }
+    }
+
+    // 3. Perform transaction to update inventory and order status
+    return this.prisma.withTransaction(async (tx) => {
+      const inventory = await tx.inventory.findUnique({
+        where: { shop_id: shopId },
+      });
+
+      if (inventory) {
+        for (const [ingredientId, amountToDeduct] of ingredientDeductions.entries()) {
+          const inventoryItem = await tx.inventoryItem.findFirst({
+            where: {
+              inventory_id: inventory.id,
+              ingredient_id: ingredientId,
+            },
+            include: { ingredient: true },
+          });
+
+          if (inventoryItem) {
+            const available = inventoryItem.theorical_quantity - (inventoryItem.minimum_threshold ?? 0);
+            if (available < amountToDeduct) {
+              const relatedItem = order.order_items.find((item) =>
+                item.product.ingredient_products.some((ip) => ip.ingredient_id === ingredientId),
+              );
+              if (relatedItem) {
+                const ip = relatedItem.product.ingredient_products.find((ip) => ip.ingredient_id === ingredientId)!;
+                const reqPerProduct = Number(ip.quantity_required);
+                const maxCanSell = reqPerProduct > 0 ? Math.floor(available / reqPerProduct) : 0;
+                const safeMax = Math.max(0, maxCanSell);
+                throw new BadRequestException(
+                  `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ. (Chỉ có thể bán thêm tối đa ${safeMax} "${relatedItem.product.product_name}")`,
+                );
+              } else {
+                throw new BadRequestException(
+                  `Sản phẩm bị hủy do nguyên liệu "${inventoryItem.ingredient.name}" không đủ (dưới ngưỡng tối thiểu).`,
+                );
+              }
+            }
+
+            await tx.inventoryItem.update({
+              where: { id: inventoryItem.id },
+              data: {
+                theorical_quantity: {
+                  decrement: Math.ceil(amountToDeduct),
+                },
+              },
+            });
+          }
+        }
+      }
+
+      // Mark order as COMPLETED
+      return tx.orders.update({
+        where: { id },
+        data: {
+          order_status: 'COMPLETED',
+          completed_at: new Date(),
+        },
+        include: {
+          shift: true,
+          cashier: { select: { id: true, full_name: true, email: true } },
+          customer: true,
+          order_items: { include: { product: true } },
+          payments: true,
+        },
+      });
+    });
+  }
+}
